@@ -1,4 +1,89 @@
-<!DOCTYPE html>
+// Test storage functionality
+        function testStorage() {
+            const testData = {
+                test: "Storage Test",
+                timestamp: new Date().toISOString()
+            };
+            
+            // Test localStorage
+            let localStorageWorking = false;
+            try {
+                localStorage.setItem('storageTest', JSON.stringify(testData));
+                const retrieved = JSON.parse(localStorage.getItem('storageTest'));
+                localStorageWorking = retrieved && retrieved.test === testData.test;
+                localStorage.removeItem('storageTest');
+            } catch (e) {
+                console.error("localStorage test failed:", e);
+            }
+            
+            // Test IndexedDB
+            let indexedDBPromise;
+            if (window.indexedDB) {
+                indexedDBPromise = new Promise((resolve) => {
+                    const request = indexedDB.open("TestDB", 1);
+                    
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains("testStore")) {
+                            db.createObjectStore("testStore", { keyPath: "id" });
+                        }
+                    };
+                    
+                    request.onsuccess = (event) => {
+                        const db = event.target.result;
+                        const transaction = db.transaction(["testStore"], "readwrite");
+                        const store = transaction.objectStore("testStore");
+                        
+                        store.put({ id: "test", ...testData });
+                        
+                        const getRequest = store.get("test");
+                        getRequest.onsuccess = () => {
+                            const retrieved = getRequest.result;
+                            const working = retrieved && retrieved.test === testData.test;
+                            db.close();
+                            resolve(working);
+                        };
+                        
+                        getRequest.onerror = () => {
+                            db.close();
+                            resolve(false);
+                        };
+                    };
+                    
+                    request.onerror = () => {
+                        resolve(false);
+                    };
+                });
+            } else {
+                indexedDBPromise = Promise.resolve(false);
+            }
+            
+            // Check current data
+            const currentData = loadSavedData();
+            
+            // Display results
+            indexedDBPromise.then(indexedDBWorking => {
+                const resultMessage = `
+Storage Test Results:
+-------------------
+localStorage: ${localStorageWorking ? '✅ Working' : '❌ Not Working'}
+IndexedDB: ${indexedDBWorking ? '✅ Working' : '❌ Not Working'}
+Current Data: ${currentData && currentData.history ? `Contains ${currentData.history.length} history records` : 'No history data found'}
+
+Your browser ${localStorageWorking || indexedDBWorking ? 'CAN' : 'CANNOT'} store data between sessions.
+${!localStorageWorking && !indexedDBWorking ? 'CRITICAL: You MUST export your data or it will be lost when you close this page!' : ''}
+`;
+                
+                alert(resultMessage);
+                
+                // Log to console as well
+                console.log("Storage test results:", {
+                    localStorageWorking,
+                    indexedDBWorking,
+                    currentData
+                });
+            });
+        }<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -292,7 +377,10 @@
             <button class="btn btn-secondary" id="importDataBtn">
                 <i class="fas fa-upload"></i> Import Data
             </button>
-            <button class="btn btn-secondary" id="clearDataBtn">
+            <button class="btn btn-secondary" id="testStorageBtn">
+                <i class="fas fa-database"></i> Test Storage
+            </button>
+            <button class="btn btn-secondary" id="clearDataBtn" style="background-color: #dc3545; color: white;">
                 <i class="fas fa-trash"></i> Clear All Data
             </button>
         </div>
@@ -422,11 +510,25 @@
         
         // Load saved data on page load
         document.addEventListener('DOMContentLoaded', async () => {
+            console.log("Page loaded, initializing app...");
+            
+            // Check if localStorage is available
+            try {
+                localStorage.setItem('test', 'test');
+                localStorage.removeItem('test');
+                console.log("localStorage is available");
+            } catch (e) {
+                console.error("localStorage is not available:", e);
+                showAlert("Warning: Your browser doesn't support local storage. Your data won't be saved between sessions.", "warning", 10000);
+            }
+            
             // Initialize IndexedDB
             const dbInitialized = await initDatabase();
+            console.log("IndexedDB initialized:", dbInitialized);
             
             // Load data (from IndexedDB if available, otherwise from localStorage)
-            loadSavedData();
+            const data = await loadSavedData();
+            console.log("Initial data loaded:", data);
             
             // Set current date
             if (!currDateEl.value) {
@@ -444,6 +546,7 @@
         clearDataBtn.addEventListener('click', confirmClearData);
         generatePdfBtn.addEventListener('click', generatePDF);
         document.getElementById('exportDataBtn').addEventListener('click', exportData);
+        document.getElementById('testStorageBtn').addEventListener('click', testStorage);
         document.getElementById('importDataBtn').addEventListener('click', () => document.getElementById('importFileInput').click());
         document.getElementById('importFileInput').addEventListener('change', importData);
         
@@ -868,6 +971,7 @@
         // Save current calculation to history
         function saveCalculation() {
             const data = loadSavedData();
+            console.log("Current data before saving:", data);
             
             // Add current reading to history
             data.history.push({
@@ -889,8 +993,22 @@
             data.ratePerKwh = parseFloat(ratePerKwhEl.value);
             data.standingCharge = parseFloat(standingChargeEl.value);
             
+            console.log("Saving updated data:", data);
+            
             // Save data
             saveData(data);
+            
+            // Confirm save was successful
+            setTimeout(() => {
+                const savedData = JSON.parse(localStorage.getItem('electricityBillData'));
+                console.log("Data after save:", savedData);
+                if (savedData && savedData.history && savedData.history.length > 0) {
+                    console.log("Save confirmed. History count:", savedData.history.length);
+                } else {
+                    console.error("Save may have failed!");
+                    showAlert("Warning: Your data may not be saving correctly. Please use the Export Data button.", "warning", 8000);
+                }
+            }, 500);
         }
         
         // Toggle history section
@@ -898,14 +1016,16 @@
             if (historySection.style.display === 'block') {
                 historySection.style.display = 'none';
             } else {
-                displayHistory();
+                // Ensure we have the latest data before displaying history
+                const data = loadSavedData();
+                displayHistory(data);
                 historySection.style.display = 'block';
             }
         }
         
         // Display history in table
-        function displayHistory() {
-            const data = loadSavedData();
+        function displayHistory(data) {
+            console.log("Displaying history data:", data.history);
             
             // Clear table
             historyTable.innerHTML = '';
