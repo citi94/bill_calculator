@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electricity Bill Calculator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4a6da7;
+            --secondary-color: #6c8cbf;
+            --accent-color: #2c3e50;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+            --danger-color: #dc3545;
+            --success-color: #28a745;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: var(--dark-color);
+            background-color: #f5f7fa;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+        
+        .section-title {
+            color: var(--accent-color);
+            margin: 25px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--secondary-color);
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .form-group label {
+            flex: 1;
+            min-width: 200px;
+            margin-right: 15px;
+            font-weight: 500;
+        }
+        
+        .form-group input {
+            flex: 2;
+            min-width: 200px;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        
+        .form-group input:read-only {
+            background-color: #f5f5f5;
+            cursor: not-allowed;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: 500;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            transition: all 0.3s;
+            margin-right: 10px;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        .btn-secondary {
+            background-color: var(--light-color);
+            color: var(--dark-color);
+            border: 1px solid #ddd;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #e9ecef;
+        }
+        
+        .buttons {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid var(--primary-color);
+            display: none;
+        }
+        
+        .results h3 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+        
+        .results-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .result-item {
+            margin-bottom: 10px;
+        }
+        
+        .result-item span {
+            font-weight: 600;
+        }
+        
+        footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #777;
+            font-size: 14px;
+        }
+        
+        .alert {
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            color: white;
+            background-color: var(--danger-color);
+            display: none;
+        }
+        
+        .history {
+            margin-top: 20px;
+            display: none;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        th {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+        
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        
+        #historyTable tbody tr {
+            cursor: pointer;
+        }
+        
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            .form-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .form-group label, .form-group input {
+                width: 100%;
+                margin-right: 0;
+            }
+            
+            .form-group label {
+                margin-bottom: 5px;
+            }
+            
+            .results-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .buttons {
+                flex-direction: column;
+            }
+            
+            .btn {
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Electricity Bill Calculator</h1>
+            <p>Calculate shared electricity costs between main and sub meters</p>
+        </header>
+        
+        <div class="alert" id="alertBox"></div>
+        
+        <h2 class="section-title">Previous Readings</h2>
+        <div class="form-group">
+            <label for="prevDate">Date:</label>
+            <input type="text" id="prevDate" readonly>
+        </div>
+        <div class="form-group">
+            <label for="prevMainMeter">Main Meter (kWh):</label>
+            <input type="text" id="prevMainMeter" readonly>
+        </div>
+        <div class="form-group">
+            <label for="prevSubMeter">Sub Meter (kWh):</label>
+            <input type="text" id="prevSubMeter" readonly>
+        </div>
+        
+        <h2 class="section-title">Current Readings</h2>
+        <div class="form-group">
+            <label for="currDate">Date (DD-MM-YYYY):</label>
+            <input type="text" id="currDate" placeholder="e.g., 25-02-2025">
+        </div>
+        <div class="form-group">
+            <label for="currMainMeter">Main Meter (kWh):</label>
+            <input type="number" id="currMainMeter" step="0.1">
+        </div>
+        <div class="form-group">
+            <label for="currSubMeter">Sub Meter (kWh):</label>
+            <input type="number" id="currSubMeter" step="0.1">
+        </div>
+        
+        <h2 class="section-title">Rates</h2>
+        <div class="form-group">
+            <label for="ratePerKwh">Rate per kWh (pence):</label>
+            <input type="number" id="ratePerKwh" step="0.01">
+        </div>
+        <div class="form-group">
+            <label for="standingCharge">Standing Charge (pence/day):</label>
+            <input type="number" id="standingCharge" step="0.01">
+        </div>
+        
+        <div class="buttons">
+            <button class="btn btn-primary" id="calculateBtn">
+                <i class="fas fa-calculator"></i> Calculate Bill
+            </button>
+            <button class="btn btn-secondary" id="showHistoryBtn">
+                <i class="fas fa-history"></i> Show History
+            </button>
+            <button class="btn btn-secondary" id="exportDataBtn">
+                <i class="fas fa-download"></i> Export Data
+            </button>
+            <button class="btn btn-secondary" id="importDataBtn">
+                <i class="fas fa-upload"></i> Import Data
+            </button>
+            <button class="btn btn-secondary" id="clearDataBtn">
+                <i class="fas fa-trash"></i> Clear All Data
+            </button>
+        </div>
+        <input type="file" id="importFileInput" accept=".json" style="display: none;">
+        
+        <div class="results" id="resultsSection">
+            <h3>Bill Calculation Results</h3>
+            <div class="results-grid">
+                <div class="result-item">Period: <span id="daysResult">-</span> days</div>
+                <div class="result-item">Main Meter Usage: <span id="mainUsageResult">-</span> kWh</div>
+                <div class="result-item">Sub Meter Usage: <span id="subUsageResult">-</span> kWh</div>
+                <div class="result-item">Coffee Shop Usage: <span id="coffeeShopUsageResult">-</span> kWh</div>
+                <div class="result-item">Standing Charge: £<span id="standingChargeResult">-</span></div>
+                <div class="result-item">Coffee Shop's Cost: £<span id="coffeeShopCostResult">-</span></div>
+                <div class="result-item">Flat's Cost: £<span id="flatCostResult">-</span></div>
+            </div>
+            <div class="buttons">
+                <button class="btn btn-secondary" id="generatePdfBtn">
+                    <i class="fas fa-file-pdf"></i> Generate PDF
+                </button>
+            </div>
+        </div>
+        
+        <div class="history" id="historySection">
+            <h3>Reading History</h3>
+            <table id="historyTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Main Meter</th>
+                        <th>Sub Meter</th>
+                        <th>Rate/kWh</th>
+                        <th>Standing Charge</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- History rows will be populated here -->
+                </tbody>
+            </table>
+            <div class="buttons">
+                <button class="btn btn-secondary" id="closeHistoryBtn">
+                    <i class="fas fa-times"></i> Close History
+                </button>
+            </div>
+        </div>
+        
+        <footer>
+            <p>&copy; 2025 Electricity Bill Calculator | Web Version</p>
+        </footer>
+    </div>
+
+    <script>
+        // Initialize jsPDF
+        const { jsPDF } = window.jspdf;
+        
+        // DOM Elements
+        const prevDateEl = document.getElementById('prevDate');
+        const prevMainMeterEl = document.getElementById('prevMainMeter');
+        const prevSubMeterEl = document.getElementById('prevSubMeter');
+        const currDateEl = document.getElementById('currDate');
+        const currMainMeterEl = document.getElementById('currMainMeter');
+        const currSubMeterEl = document.getElementById('currSubMeter');
+        const ratePerKwhEl = document.getElementById('ratePerKwh');
+        const standingChargeEl = document.getElementById('standingCharge');
+        const calculateBtn = document.getElementById('calculateBtn');
+        const showHistoryBtn = document.getElementById('showHistoryBtn');
+        const closeHistoryBtn = document.getElementById('closeHistoryBtn');
+        const clearDataBtn = document.getElementById('clearDataBtn');
+        const generatePdfBtn = document.getElementById('generatePdfBtn');
+        const resultsSection = document.getElementById('resultsSection');
+        const historySection = document.getElementById('historySection');
+        const historyTable = document.getElementById('historyTable').getElementsByTagName('tbody')[0];
+        const alertBox = document.getElementById('alertBox');
+        
+        // Default data
+        const defaultData = {
+            ratePerKwh: 28.0,
+            standingCharge: 140.0,
+            lastReadings: {
+                date: formatDate(new Date()),
+                mainMeter: 0.0,
+                subMeter: 0.0
+            },
+            history: [],
+            lastBackupDate: null
+        };
+        
+        // Current calculation results
+        let currentResults = null;
+        
+        // IndexedDB setup
+        let db;
+        const DB_NAME = "ElectricityBillDB";
+        const STORE_NAME = "billData";
+        
+        function initDatabase() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, 1);
+                
+                request.onerror = event => {
+                    console.error("IndexedDB error:", event.target.error);
+                    // Fall back to localStorage if IndexedDB fails
+                    showAlert("Warning: Using less reliable storage. Please export your data regularly.", "warning", 8000);
+                    resolve(false);
+                };
+                
+                request.onupgradeneeded = event => {
+                    db = event.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { keyPath: "id" });
+                    }
+                };
+                
+                request.onsuccess = event => {
+                    db = event.target.result;
+                    console.log("IndexedDB initialized successfully");
+                    resolve(true);
+                };
+            });
+        }
+        
+        // Load saved data on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Initialize IndexedDB
+            const dbInitialized = await initDatabase();
+            
+            // Load data (from IndexedDB if available, otherwise from localStorage)
+            loadSavedData();
+            
+            // Set current date
+            if (!currDateEl.value) {
+                currDateEl.value = formatDate(new Date());
+            }
+            
+            // Check if backup reminder needed
+            checkBackupReminder();
+        });
+        
+        // Event listeners
+        calculateBtn.addEventListener('click', calculateBill);
+        showHistoryBtn.addEventListener('click', toggleHistory);
+        closeHistoryBtn.addEventListener('click', toggleHistory);
+        clearDataBtn.addEventListener('click', confirmClearData);
+        generatePdfBtn.addEventListener('click', generatePDF);
+        document.getElementById('exportDataBtn').addEventListener('click', exportData);
+        document.getElementById('importDataBtn').addEventListener('click', () => document.getElementById('importFileInput').click());
+        document.getElementById('importFileInput').addEventListener('change', importData);
+        
+        // Format date as DD-MM-YYYY
+        function formatDate(date) {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            return `${day}-${month}-${year}`;
+        }
+        
+        // Load saved data (tries IndexedDB first, falls back to localStorage)
+        async function loadSavedData() {
+            let data;
+            
+            // Try to load from IndexedDB first
+            if (db) {
+                try {
+                    data = await getDataFromIndexedDB();
+                } catch (error) {
+                    console.error("Error loading from IndexedDB:", error);
+                }
+            }
+            
+            // Fall back to localStorage if IndexedDB failed or is not available
+            if (!data) {
+                let storedData = localStorage.getItem('electricityBillData');
+                data = storedData ? JSON.parse(storedData) : defaultData;
+            }
+            
+            // Populate previous readings
+            prevDateEl.value = data.lastReadings.date;
+            prevMainMeterEl.value = data.lastReadings.mainMeter;
+            prevSubMeterEl.value = data.lastReadings.subMeter;
+            
+            // Populate rates
+            ratePerKwhEl.value = data.ratePerKwh;
+            standingChargeEl.value = data.standingCharge;
+            
+            return data;
+        }
+        
+        // Get data from IndexedDB
+        function getDataFromIndexedDB() {
+            return new Promise((resolve, reject) => {
+                if (!db) {
+                    reject("Database not initialized");
+                    return;
+                }
+                
+                const transaction = db.transaction([STORE_NAME], "readonly");
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.get("mainData");
+                
+                request.onerror = event => {
+                    reject("Error fetching data from IndexedDB");
+                };
+                
+                request.onsuccess = event => {
+                    resolve(request.result ? request.result.data : null);
+                };
+            });
+        }
+        
+        // Save data (to both IndexedDB and localStorage for redundancy)
+        async function saveData(data) {
+            // Always save to localStorage as backup
+            localStorage.setItem('electricityBillData', JSON.stringify(data));
+            
+            // Save to IndexedDB if available
+            if (db) {
+                try {
+                    await saveDataToIndexedDB(data);
+                } catch (error) {
+                    console.error("Error saving to IndexedDB:", error);
+                    showAlert("Warning: Could not save to persistent storage. Your data is at risk.", "warning", 5000);
+                }
+            }
+        }
+        
+        // Save data to IndexedDB
+        function saveDataToIndexedDB(data) {
+            return new Promise((resolve, reject) => {
+                if (!db) {
+                    reject("Database not initialized");
+                    return;
+                }
+                
+                const transaction = db.transaction([STORE_NAME], "readwrite");
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.put({
+                    id: "mainData",
+                    data: data,
+                    lastUpdated: new Date().toISOString()
+                });
+                
+                request.onerror = event => {
+                    reject("Error saving data to IndexedDB");
+                };
+                
+                request.onsuccess = event => {
+                    resolve();
+                };
+            });
+        }
+        
+        // Validate inputs
+        function validateInputs() {
+            try {
+                // Parse dates
+                const prevDate = parseDate(prevDateEl.value);
+                const currDate = parseDate(currDateEl.value);
+                
+                if (isNaN(prevDate) || isNaN(currDate)) {
+                    showAlert("Invalid date format. Please use DD-MM-YYYY.");
+                    return false;
+                }
+                
+                if (currDate <= prevDate) {
+                    showAlert("Current date must be after previous date.");
+                    return false;
+                }
+                
+                // Parse meter readings
+                const prevMain = parseFloat(prevMainMeterEl.value);
+                const currMain = parseFloat(currMainMeterEl.value);
+                const prevSub = parseFloat(prevSubMeterEl.value);
+                const currSub = parseFloat(currSubMeterEl.value);
+                
+                if (isNaN(prevMain) || isNaN(currMain) || isNaN(prevSub) || isNaN(currSub)) {
+                    showAlert("All meter readings must be valid numbers.");
+                    return false;
+                }
+                
+                // Check meter readings are increasing
+                if (currMain <= prevMain) {
+                    showAlert("Current main meter reading must be higher than previous reading.");
+                    return false;
+                }
+                
+                if (currSub <= prevSub) {
+                    showAlert("Current sub meter reading must be higher than previous reading.");
+                    return false;
+                }
+                
+                // Check sub meter readings are less than main meter
+                if (prevSub > prevMain || currSub > currMain) {
+                    showAlert("Sub meter readings cannot be higher than main meter readings.");
+                    return false;
+                }
+                
+                // Validate rates
+                const ratePerKwh = parseFloat(ratePerKwhEl.value);
+                const standingCharge = parseFloat(standingChargeEl.value);
+                
+                if (isNaN(ratePerKwh) || ratePerKwh <= 0 || isNaN(standingCharge) || standingCharge <= 0) {
+                    showAlert("Rates must be positive numbers.");
+                    return false;
+                }
+                
+                return true;
+            } catch (error) {
+                showAlert("Validation error: " + error.message);
+                return false;
+            }
+        }
+        
+        // Parse date string (DD-MM-YYYY) to Date object
+        function parseDate(dateString) {
+            const parts = dateString.split('-');
+            if (parts.length !== 3) return NaN;
+            
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1; // Months are 0-indexed in JS
+            const year = parseInt(parts[2], 10);
+            
+            return new Date(year, month, day);
+        }
+        
+        // Show alert message with type (error, warning, success)
+        function showAlert(message, type = "error", duration = 5000) {
+            alertBox.textContent = message;
+            alertBox.style.display = 'block';
+            
+            // Set color based on type
+            if (type === "warning") {
+                alertBox.style.backgroundColor = "#f0ad4e"; // Warning yellow
+            } else if (type === "success") {
+                alertBox.style.backgroundColor = "var(--success-color)";
+            } else {
+                alertBox.style.backgroundColor = "var(--danger-color)";
+            }
+            
+            // Auto hide after specified duration
+            setTimeout(() => {
+                alertBox.style.display = 'none';
+            }, duration);
+        }
+        
+        // Export data to JSON file
+        function exportData() {
+            const data = loadSavedData();
+            
+            // Add export timestamp
+            data.exportDate = new Date().toISOString();
+            
+            // Convert to JSON string
+            const jsonData = JSON.stringify(data, null, 2);
+            
+            // Create blob and download link
+            const blob = new Blob([jsonData], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            
+            // Create and trigger download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ElectricityBillData_${formatDate(new Date()).replace(/-/g, '')}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            // Update last backup date
+            updateLastBackupDate();
+            
+            showAlert("Data exported successfully! Keep this file safe.", "success");
+        }
+        
+        // Import data from JSON file
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            
+            reader.onload = async function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    // Validate imported data has required structure
+                    if (!importedData.lastReadings || !importedData.history) {
+                        throw new Error("Invalid data format");
+                    }
+                    
+                    // Save the imported data
+                    await saveData(importedData);
+                    
+                    // Reload UI with imported data
+                    loadSavedData();
+                    
+                    showAlert("Data imported successfully!", "success");
+                } catch (error) {
+                    console.error("Import error:", error);
+                    showAlert("Error importing data. Invalid file format.");
+                }
+                
+                // Reset file input
+                event.target.value = '';
+            };
+            
+            reader.readAsText(file);
+        }
+        
+        // Update the last backup date
+        function updateLastBackupDate() {
+            const data = loadSavedData();
+            data.lastBackupDate = new Date().toISOString();
+            saveData(data);
+        }
+        
+        // Check if backup reminder is needed
+        function checkBackupReminder() {
+            const data = loadSavedData();
+            
+            if (data.history && data.history.length > 0) {
+                // If there's history data but no backup date or it's been more than 3 months
+                if (!data.lastBackupDate || isOlderThanMonths(new Date(data.lastBackupDate), 3)) {
+                    showBackupReminder();
+                }
+            }
+        }
+        
+        // Show backup reminder notification
+        function showBackupReminder() {
+            // Create a more prominent reminder div
+            const reminderDiv = document.createElement('div');
+            reminderDiv.className = 'alert';
+            reminderDiv.style.backgroundColor = '#f0ad4e';
+            reminderDiv.style.color = 'black';
+            reminderDiv.style.padding = '15px';
+            reminderDiv.style.marginBottom = '20px';
+            reminderDiv.style.borderRadius = '5px';
+            reminderDiv.style.display = 'flex';
+            reminderDiv.style.justifyContent = 'space-between';
+            reminderDiv.style.alignItems = 'center';
+            
+            // Add warning icon and message
+            reminderDiv.innerHTML = `
+                <div>
+                    <i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i>
+                    <strong>Important:</strong> It's been a while since you backed up your data. 
+                    Your electricity readings are valuable - please export them now to avoid losing your history.
+                </div>
+                <button class="btn btn-secondary" id="backupNowBtn" style="margin-left: 10px;">
+                    <i class="fas fa-download"></i> Backup Now
+                </button>
+            `;
+            
+            // Insert at the top of the container
+            const container = document.querySelector('.container');
+            container.insertBefore(reminderDiv, container.firstChild);
+            
+            // Add event listener to backup button
+            document.getElementById('backupNowBtn').addEventListener('click', () => {
+                exportData();
+                reminderDiv.remove();
+            });
+        }
+        
+        // Check if a date is older than the specified number of months
+        function isOlderThanMonths(date, months) {
+            const now = new Date();
+            const monthsDiff = (now.getFullYear() - date.getFullYear()) * 12 + 
+                               (now.getMonth() - date.getMonth());
+            return monthsDiff >= months;
+        }
+        
+        // Calculate bill
+        function calculateBill() {
+            if (!validateInputs()) return;
+            
+            // Get values
+            const prevDate = parseDate(prevDateEl.value);
+            const currDate = parseDate(currDateEl.value);
+            
+            const prevMain = parseFloat(prevMainMeterEl.value);
+            const currMain = parseFloat(currMainMeterEl.value);
+            const prevSub = parseFloat(prevSubMeterEl.value);
+            const currSub = parseFloat(currSubMeterEl.value);
+            
+            const ratePerKwh = parseFloat(ratePerKwhEl.value) / 100; // Convert pence to pounds
+            const standingCharge = parseFloat(standingChargeEl.value) / 100; // Convert pence to pounds
+            
+            // Calculate
+            const days = Math.round((currDate - prevDate) / (1000 * 60 * 60 * 24));
+            const mainMeterUsage = currMain - prevMain;
+            const subMeterUsage = currSub - prevSub;
+            const coffeeShopUsage = mainMeterUsage - subMeterUsage;
+            
+            const totalStandingCharge = days * standingCharge;
+            const sharedStandingCharge = totalStandingCharge / 2;
+            
+            const coffeeShopCost = (coffeeShopUsage * ratePerKwh) + sharedStandingCharge;
+            const totalCost = (mainMeterUsage * ratePerKwh) + totalStandingCharge;
+            const flatCost = totalCost - coffeeShopCost;
+            
+            // Store results
+            currentResults = {
+                days,
+                mainMeterUsage,
+                subMeterUsage,
+                coffeeShopUsage,
+                totalStandingCharge,
+                sharedStandingCharge,
+                coffeeShopCost,
+                flatCost,
+                ratePerKwh: parseFloat(ratePerKwhEl.value),
+                standingCharge: parseFloat(standingChargeEl.value)
+            };
+            
+            // Display results
+            document.getElementById('daysResult').textContent = days;
+            document.getElementById('mainUsageResult').textContent = mainMeterUsage.toFixed(1);
+            document.getElementById('subUsageResult').textContent = subMeterUsage.toFixed(1);
+            document.getElementById('coffeeShopUsageResult').textContent = coffeeShopUsage.toFixed(1);
+            document.getElementById('standingChargeResult').textContent = totalStandingCharge.toFixed(2);
+            document.getElementById('coffeeShopCostResult').textContent = coffeeShopCost.toFixed(2);
+            document.getElementById('flatCostResult').textContent = flatCost.toFixed(2);
+            
+            // Show results section
+            resultsSection.style.display = 'block';
+            
+            // Add to history and save data
+            saveCalculation();
+        }
+        
+        // Save current calculation to history
+        function saveCalculation() {
+            const data = loadSavedData();
+            
+            // Add current reading to history
+            data.history.push({
+                date: currDateEl.value,
+                mainMeter: parseFloat(currMainMeterEl.value),
+                subMeter: parseFloat(currSubMeterEl.value),
+                ratePerKwh: parseFloat(ratePerKwhEl.value),
+                standingCharge: parseFloat(standingChargeEl.value)
+            });
+            
+            // Update last readings
+            data.lastReadings = {
+                date: currDateEl.value,
+                mainMeter: parseFloat(currMainMeterEl.value),
+                subMeter: parseFloat(currSubMeterEl.value)
+            };
+            
+            // Update rates
+            data.ratePerKwh = parseFloat(ratePerKwhEl.value);
+            data.standingCharge = parseFloat(standingChargeEl.value);
+            
+            // Save to localStorage
+            saveData(data);
+        }
+        
+        // Toggle history section
+        function toggleHistory() {
+            if (historySection.style.display === 'block') {
+                historySection.style.display = 'none';
+            } else {
+                displayHistory();
+                historySection.style.display = 'block';
+            }
+        }
+        
+        // Display history in table
+        function displayHistory() {
+            const data = loadSavedData();
+            
+            // Clear table
+            historyTable.innerHTML = '';
+            
+            // Sort history by date (newest first)
+            const sortedHistory = [...data.history].sort((a, b) => {
+                const dateA = parseDate(a.date);
+                const dateB = parseDate(b.date);
+                return dateB - dateA;
+            });
+            
+            // Add rows
+            sortedHistory.forEach(reading => {
+                const row = historyTable.insertRow();
+                
+                row.insertCell().textContent = reading.date;
+                row.insertCell().textContent = reading.mainMeter.toFixed(1);
+                row.insertCell().textContent = reading.subMeter.toFixed(1);
+                row.insertCell().textContent = reading.ratePerKwh.toFixed(2);
+                row.insertCell().textContent = reading.standingCharge.toFixed(2);
+                
+                // Add click event to load this reading as previous
+                row.addEventListener('click', () => {
+                    loadReadingAsPrevious(reading);
+                    historySection.style.display = 'none';
+                });
+            });
+            
+            // Show empty message if no history
+            if (sortedHistory.length === 0) {
+                const row = historyTable.insertRow();
+                const cell = row.insertCell();
+                cell.colSpan = 5;
+                cell.textContent = 'No history available';
+                cell.style.textAlign = 'center';
+            }
+        }
+        
+        // Load a reading from history as previous reading
+        function loadReadingAsPrevious(reading) {
+            prevDateEl.value = reading.date;
+            prevMainMeterEl.value = reading.mainMeter;
+            prevSubMeterEl.value = reading.subMeter;
+            
+            // Also update in saved data
+            const data = loadSavedData();
+            data.lastReadings = {
+                date: reading.date,
+                mainMeter: reading.mainMeter,
+                subMeter: reading.subMeter
+            };
+            saveData(data);
+            
+            showAlert("Previous readings updated.");
+        }
+        
+        // Confirm and clear all data
+        function confirmClearData() {
+            if (confirm("Are you sure you want to clear all saved data? This action cannot be undone.")) {
+                localStorage.removeItem('electricityBillData');
+                loadSavedData();
+                resultsSection.style.display = 'none';
+                historySection.style.display = 'none';
+                showAlert("All data has been cleared.");
+            }
+        }
+        
+        // Generate PDF with calculation details
+        function generatePDF() {
+            if (!currentResults) {
+                showAlert("Please calculate the bill first.");
+                return;
+            }
+            
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const margin = 20;
+            let yPos = 20;
+            
+            // Title
+            doc.setFontSize(18);
+            doc.text("Detailed Electricity Bill Calculation", pageWidth / 2, yPos, { align: "center" });
+            yPos += 15;
+            
+            // Set regular font
+            doc.setFontSize(12);
+            
+            // Dates and period
+            doc.text(`Previous reading date: ${prevDateEl.value}`, margin, yPos);
+            yPos += 8;
+            doc.text(`Current reading date: ${currDateEl.value}`, margin, yPos);
+            yPos += 8;
+            doc.text(`Days between readings: ${currentResults.days}`, margin, yPos);
+            yPos += 10;
+            
+            // Separator
+            doc.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 10;
+            
+            // Meter readings
+            doc.text(`Main meter previous reading: ${prevMainMeterEl.value} kWh`, margin, yPos);
+            yPos += 8;
+            doc.text(`Main meter current reading: ${currMainMeterEl.value} kWh`, margin, yPos);
+            yPos += 8;
+            doc.text(`Sub meter previous reading: ${prevSubMeterEl.value} kWh`, margin, yPos);
+            yPos += 8;
+            doc.text(`Sub meter current reading: ${currSubMeterEl.value} kWh`, margin, yPos);
+            yPos += 10;
+            
+            // Separator
+            doc.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 10;
+            
+            // Usage
+            doc.text(`Main meter usage: ${currentResults.mainMeterUsage.toFixed(1)} kWh`, margin, yPos);
+            yPos += 8;
+            doc.text(`Sub meter usage: ${currentResults.subMeterUsage.toFixed(1)} kWh`, margin, yPos);
+            yPos += 8;
+            doc.text(`Coffee Shop's electricity usage: ${currentResults.coffeeShopUsage.toFixed(1)} kWh`, margin, yPos);
+            yPos += 10;
+            
+            // Separator
+            doc.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 10;
+            
+            // Rates and charges
+            doc.text(`Rate per kWh: £${(currentResults.ratePerKwh / 100).toFixed(2)}`, margin, yPos);
+            yPos += 8;
+            doc.text(`Daily standing charge: £${(currentResults.standingCharge / 100).toFixed(2)} per day`, margin, yPos);
+            yPos += 8;
+            doc.text(`Total standing charge for period: £${currentResults.totalStandingCharge.toFixed(2)}`, margin, yPos);
+            yPos += 8;
+            doc.text(`Shared standing charge (Coffee Shop & Flat): £${currentResults.sharedStandingCharge.toFixed(2)} each`, margin, yPos);
+            yPos += 10;
+            
+            // Separator
+            doc.line(margin, yPos, pageWidth - margin, yPos);
+            yPos += 10;
+            
+            // Final costs
+            doc.text(`Coffee Shop's cost (kWh usage + shared standing charge): £${currentResults.coffeeShopCost.toFixed(2)}`, margin, yPos);
+            yPos += 8;
+            doc.text(`Flat's cost (Total cost - Coffee Shop's cost): £${currentResults.flatCost.toFixed(2)}`, margin, yPos);
+            
+            // Generate filename based on current date
+            const filename = `ElectricityBill_${currDateEl.value.replace(/-/g, '')}.pdf`;
+            
+            // Save PDF
+            doc.save(filename);
+        }
+    </script>
+</body>
+</html>
