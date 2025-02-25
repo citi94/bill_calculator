@@ -80,7 +80,8 @@
             font-size: 16px;
         }
         
-        .form-group input:read-only {
+        .form-group input:read-only,
+        .form-group input.readonly {
             background-color: #f5f5f5;
             cursor: not-allowed;
         }
@@ -243,15 +244,15 @@
         <h2 class="section-title">Previous Readings</h2>
         <div class="form-group">
             <label for="prevDate">Date:</label>
-            <input type="text" id="prevDate" readonly>
+            <input type="text" id="prevDate">
         </div>
         <div class="form-group">
             <label for="prevMainMeter">Main Meter (kWh):</label>
-            <input type="text" id="prevMainMeter" readonly>
+            <input type="number" id="prevMainMeter" step="0.1">
         </div>
         <div class="form-group">
             <label for="prevSubMeter">Sub Meter (kWh):</label>
-            <input type="text" id="prevSubMeter" readonly>
+            <input type="number" id="prevSubMeter" step="0.1">
         </div>
         
         <h2 class="section-title">Current Readings</h2>
@@ -339,7 +340,7 @@
         </div>
         
         <footer>
-            <p>&copy; 2025 Electricity Bill Calculator | Web Version</p>
+            <p>&copy; 2025 Peter Harding | Electricity Bill Calculator | Web Version</p>
         </footer>
     </div>
 
@@ -475,6 +476,26 @@
             // Populate rates
             ratePerKwhEl.value = data.ratePerKwh;
             standingChargeEl.value = data.standingCharge;
+            
+            // Set previous readings to readonly only if there's history data
+            if (data.history && data.history.length > 0) {
+                prevDateEl.readOnly = true;
+                prevMainMeterEl.readOnly = true;
+                prevSubMeterEl.readOnly = true;
+                
+                // Add visual indicator
+                prevDateEl.classList.add('readonly');
+                prevMainMeterEl.classList.add('readonly'); 
+                prevSubMeterEl.classList.add('readonly');
+            } else {
+                prevDateEl.readOnly = false;
+                prevMainMeterEl.readOnly = false;
+                prevSubMeterEl.readOnly = false;
+                
+                prevDateEl.classList.remove('readonly');
+                prevMainMeterEl.classList.remove('readonly');
+                prevSubMeterEl.classList.remove('readonly');
+            }
             
             return data;
         }
@@ -846,8 +867,20 @@
             data.ratePerKwh = parseFloat(ratePerKwhEl.value);
             data.standingCharge = parseFloat(standingChargeEl.value);
             
-            // Save to localStorage
+            // Save data
             saveData(data);
+            
+            // Once there's data in history, make previous readings read-only
+            if (data.history.length > 0) {
+                prevDateEl.readOnly = true;
+                prevMainMeterEl.readOnly = true;
+                prevSubMeterEl.readOnly = true;
+                
+                // Add visual indicator
+                prevDateEl.classList.add('readonly');
+                prevMainMeterEl.classList.add('readonly');
+                prevSubMeterEl.classList.add('readonly');
+            }
         }
         
         // Toggle history section
