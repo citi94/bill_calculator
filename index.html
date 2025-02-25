@@ -390,6 +390,12 @@
         
         function initDatabase() {
             return new Promise((resolve, reject) => {
+                // Check if IndexedDB is available
+                if (!window.indexedDB) {
+                    console.log("IndexedDB not supported, falling back to localStorage only");
+                    return resolve(false);
+                }
+                
                 const request = indexedDB.open(DB_NAME, 1);
                 
                 request.onerror = event => {
@@ -400,7 +406,7 @@
                 };
                 
                 request.onupgradeneeded = event => {
-                    db = event.target.result;
+                    const db = event.target.result;
                     if (!db.objectStoreNames.contains(STORE_NAME)) {
                         db.createObjectStore(STORE_NAME, { keyPath: "id" });
                     }
@@ -449,14 +455,15 @@
             return `${day}-${month}-${year}`;
         }
         
-        // Load saved data (tries IndexedDB first, falls back to localStorage)
+        // Load saved data from all available sources
         async function loadSavedData() {
-            let data;
+            let data = null;
             
             // Try to load from IndexedDB first
             if (db) {
                 try {
                     data = await getDataFromIndexedDB();
+                    console.log("Data loaded from IndexedDB:", data ? "success" : "no data found");
                 } catch (error) {
                     console.error("Error loading from IndexedDB:", error);
                 }
@@ -464,8 +471,19 @@
             
             // Fall back to localStorage if IndexedDB failed or is not available
             if (!data) {
-                let storedData = localStorage.getItem('electricityBillData');
-                data = storedData ? JSON.parse(storedData) : defaultData;
+                try {
+                    let storedData = localStorage.getItem('electricityBillData');
+                    if (storedData) {
+                        data = JSON.parse(storedData);
+                        console.log("Data loaded from localStorage");
+                    } else {
+                        data = defaultData;
+                        console.log("No stored data found, using default data");
+                    }
+                } catch (error) {
+                    console.error("Error loading from localStorage:", error);
+                    data = defaultData;
+                }
             }
             
             // Populate previous readings
@@ -477,25 +495,14 @@
             ratePerKwhEl.value = data.ratePerKwh;
             standingChargeEl.value = data.standingCharge;
             
-            // Set previous readings to readonly only if there's history data
-            if (data.history && data.history.length > 0) {
-                prevDateEl.readOnly = true;
-                prevMainMeterEl.readOnly = true;
-                prevSubMeterEl.readOnly = true;
-                
-                // Add visual indicator
-                prevDateEl.classList.add('readonly');
-                prevMainMeterEl.classList.add('readonly'); 
-                prevSubMeterEl.classList.add('readonly');
-            } else {
-                prevDateEl.readOnly = false;
-                prevMainMeterEl.readOnly = false;
-                prevSubMeterEl.readOnly = false;
-                
-                prevDateEl.classList.remove('readonly');
-                prevMainMeterEl.classList.remove('readonly');
-                prevSubMeterEl.classList.remove('readonly');
-            }
+            // Always keep previous readings editable so users can correct mistakes
+            prevDateEl.readOnly = false;
+            prevMainMeterEl.readOnly = false;
+            prevSubMeterEl.readOnly = false;
+            
+            prevDateEl.classList.remove('readonly');
+            prevMainMeterEl.classList.remove('readonly');
+            prevSubMeterEl.classList.remove('readonly');
             
             return data;
         }
@@ -525,12 +532,19 @@
         // Save data (to both IndexedDB and localStorage for redundancy)
         async function saveData(data) {
             // Always save to localStorage as backup
-            localStorage.setItem('electricityBillData', JSON.stringify(data));
+            try {
+                localStorage.setItem('electricityBillData', JSON.stringify(data));
+                console.log("Data saved to localStorage");
+            } catch (error) {
+                console.error("Error saving to localStorage:", error);
+                showAlert("Warning: Could not save to localStorage. Your data is at risk.", "warning", 5000);
+            }
             
             // Save to IndexedDB if available
             if (db) {
                 try {
                     await saveDataToIndexedDB(data);
+                    console.log("Data saved to IndexedDB");
                 } catch (error) {
                     console.error("Error saving to IndexedDB:", error);
                     showAlert("Warning: Could not save to persistent storage. Your data is at risk.", "warning", 5000);
@@ -841,6 +855,11 @@
             
             // Add to history and save data
             saveCalculation();
+            
+            // Remind user to export data if needed
+            if (Math.random() < 0.3) {  // Occasional reminder (30% chance)
+                showAlert("Remember to export your data regularly using the 'Export Data' button for safekeeping!", "warning", 6000);
+            }
         }
         
         // Save current calculation to history
@@ -869,18 +888,6 @@
             
             // Save data
             saveData(data);
-            
-            // Once there's data in history, make previous readings read-only
-            if (data.history.length > 0) {
-                prevDateEl.readOnly = true;
-                prevMainMeterEl.readOnly = true;
-                prevSubMeterEl.readOnly = true;
-                
-                // Add visual indicator
-                prevDateEl.classList.add('readonly');
-                prevMainMeterEl.classList.add('readonly');
-                prevSubMeterEl.classList.add('readonly');
-            }
         }
         
         // Toggle history section
