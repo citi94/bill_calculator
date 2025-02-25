@@ -606,7 +606,7 @@
                     return false;
                 }
                 
-                // Check meter readings are increasing
+                // Check meter readings are increasing (no rollover handling)
                 if (currMain <= prevMain) {
                     showAlert("Current main meter reading must be higher than previous reading.");
                     return false;
@@ -617,9 +617,12 @@
                     return false;
                 }
                 
-                // Check sub meter readings are less than main meter
-                if (prevSub > prevMain || currSub > currMain) {
-                    showAlert("Sub meter readings cannot be higher than main meter readings.");
+                // Check the consumption from sub meter isn't greater than main meter
+                const mainConsumption = currMain - prevMain;
+                const subConsumption = currSub - prevSub;
+                
+                if (subConsumption > mainConsumption) {
+                    showAlert("Sub meter consumption cannot be higher than main meter consumption. The main meter must show equal or more usage than the shop meter.");
                     return false;
                 }
                 
