@@ -9,6 +9,6 @@
 
 [dev]
   publish = "."
-  port = 9000       # This is the external port (different from coffee_orders)
-  targetPort = 4000 # This is the internal port (different from 3999)
+  port = 9000
+  staticServerPort = 4000  # Use this instead of targetPort for static servers
   framework = "#static"
