@@ -3,1029 +3,297 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Calculate shared electricity costs between main and sub meters">
+    <meta name="theme-color" content="#4a6da7">
     <title>Electricity Bill Calculator</title>
+    
+    <!-- PWA Support -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192x192.png">
+    
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/components.css">
+    
+    <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --primary-color: #4a6da7;
-            --secondary-color: #6c8cbf;
-            --accent-color: #2c3e50;
-            --light-color: #f8f9fa;
-            --dark-color: #343a40;
-            --danger-color: #dc3545;
-            --success-color: #28a745;
-            --warning-color: #f0ad4e;
-        }
-        
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            line-height: 1.6;
-            color: var(--dark-color);
-            background-color: #f5f7fa;
-            padding: 20px;
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
-        h1 {
-            color: var(--primary-color);
-            margin-bottom: 10px;
-        }
-        
-        .section-title {
-            color: var(--accent-color);
-            margin: 25px 0 15px 0;
-            padding-bottom: 8px;
-            border-bottom: 2px solid var(--secondary-color);
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        
-        .form-group label {
-            flex: 1;
-            min-width: 200px;
-            margin-right: 15px;
-            font-weight: 500;
-        }
-        
-        .form-group input {
-            flex: 2;
-            min-width: 200px;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-        
-        .form-group input.readonly {
-            background-color: #f5f5f5;
-        }
-        
-        .btn {
-            display: inline-block;
-            padding: 10px 20px;
-            font-size: 16px;
-            font-weight: 500;
-            text-align: center;
-            cursor: pointer;
-            border: none;
-            border-radius: 5px;
-            transition: all 0.3s;
-            margin-right: 10px;
-        }
-        
-        .btn-primary {
-            background-color: var(--primary-color);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background-color: var(--secondary-color);
-        }
-        
-        .btn-secondary {
-            background-color: var(--light-color);
-            color: var(--dark-color);
-            border: 1px solid #ddd;
-        }
-        
-        .btn-secondary:hover {
-            background-color: #e9ecef;
-        }
-        
-        .btn-danger {
-            background-color: var(--danger-color);
-            color: white;
-        }
-        
-        .buttons {
-            margin: 20px 0;
-            display: flex;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        
-        .results {
-            margin-top: 30px;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            border-left: 4px solid var(--primary-color);
-            display: none;
-        }
-        
-        .results h3 {
-            color: var(--primary-color);
-            margin-bottom: 15px;
-        }
-        
-        .results-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-        
-        .result-item {
-            margin-bottom: 10px;
-        }
-        
-        .result-item span {
-            font-weight: 600;
-        }
-        
-        footer {
-            margin-top: 30px;
-            text-align: center;
-            color: #777;
-            font-size: 14px;
-        }
-        
-        .alert {
-            padding: 10px 15px;
-            margin-bottom: 15px;
-            border-radius: 4px;
-            color: white;
-            background-color: var(--danger-color);
-            display: none;
-        }
-        
-        .history {
-            margin-top: 20px;
-            display: none;
-        }
-        
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 15px;
-        }
-        
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-        
-        th {
-            background-color: var(--secondary-color);
-            color: white;
-        }
-        
-        tr:hover {
-            background-color: #f5f5f5;
-        }
-        
-        #historyTable tbody tr {
-            cursor: pointer;
-        }
-        
-        .backup-reminder {
-            background-color: var(--warning-color);
-            color: black;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        /* Mobile Responsiveness */
-        @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-            
-            .form-group {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            
-            .form-group label, .form-group input {
-                width: 100%;
-                margin-right: 0;
-            }
-            
-            .form-group label {
-                margin-bottom: 5px;
-            }
-            
-            .results-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .buttons {
-                flex-direction: column;
-            }
-            
-            .btn {
-                margin-bottom: 10px;
-                margin-right: 0;
-                width: 100%;
-            }
-            
-            .backup-reminder {
-                flex-direction: column;
-            }
-            
-            .backup-reminder button {
-                margin-top: 10px;
-                width: 100%;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
+    <div class="app-container">
         <header>
             <h1>Electricity Bill Calculator</h1>
             <p>Calculate shared electricity costs between main and sub meters</p>
         </header>
         
-        <div id="backupReminderContainer"></div>
-        <div class="alert" id="alertBox"></div>
+        <nav class="tab-navigation">
+            <button id="tabCalculator" class="tab-button active">Calculator</button>
+            <button id="tabHistory" class="tab-button">History</button>
+            <button id="tabSettings" class="tab-button">Settings</button>
+        </nav>
         
-        <h2 class="section-title">Previous Readings</h2>
-        <div class="form-group">
-            <label for="prevDate">Date (DD-MM-YYYY):</label>
-            <input type="text" id="prevDate" placeholder="e.g., 19-07-2024">
-        </div>
-        <div class="form-group">
-            <label for="prevMainMeter">Main Meter (kWh):</label>
-            <input type="number" id="prevMainMeter" step="0.1">
-        </div>
-        <div class="form-group">
-            <label for="prevSubMeter">Sub Meter (kWh):</label>
-            <input type="number" id="prevSubMeter" step="0.1">
-        </div>
-        
-        <h2 class="section-title">Current Readings</h2>
-        <div class="form-group">
-            <label for="currDate">Date (DD-MM-YYYY):</label>
-            <input type="text" id="currDate" placeholder="e.g., 25-02-2025">
-        </div>
-        <div class="form-group">
-            <label for="currMainMeter">Main Meter (kWh):</label>
-            <input type="number" id="currMainMeter" step="0.1">
-        </div>
-        <div class="form-group">
-            <label for="currSubMeter">Sub Meter (kWh):</label>
-            <input type="number" id="currSubMeter" step="0.1">
-        </div>
-        
-        <h2 class="section-title">Rates</h2>
-        <div class="form-group">
-            <label for="ratePerKwh">Rate per kWh (pence):</label>
-            <input type="number" id="ratePerKwh" step="0.01">
-        </div>
-        <div class="form-group">
-            <label for="standingCharge">Standing Charge (pence/day):</label>
-            <input type="number" id="standingCharge" step="0.01">
-        </div>
-        
-        <div class="buttons">
-            <button class="btn btn-primary" id="calculateBtn">
-                <i class="fas fa-calculator"></i> Calculate Bill
-            </button>
-            <button class="btn btn-secondary" id="showHistoryBtn">
-                <i class="fas fa-history"></i> Show History
-            </button>
-            <button class="btn btn-secondary" id="exportDataBtn">
-                <i class="fas fa-download"></i> Export Data
-            </button>
-            <button class="btn btn-secondary" id="importDataBtn">
-                <i class="fas fa-upload"></i> Import Data
-            </button>
-            <button class="btn btn-danger" id="clearDataBtn">
-                <i class="fas fa-trash"></i> Clear All Data
-            </button>
-        </div>
-        <input type="file" id="importFileInput" accept=".json" style="display: none;">
-        
-        <div class="results" id="resultsSection">
-            <h3>Bill Calculation Results</h3>
-            <div class="results-grid">
-                <div class="result-item">Period: <span id="daysResult">-</span> days</div>
-                <div class="result-item">Main Meter Usage: <span id="mainUsageResult">-</span> kWh</div>
-                <div class="result-item">Sub Meter Usage: <span id="subUsageResult">-</span> kWh</div>
-                <div class="result-item">Coffee Shop Usage: <span id="coffeeShopUsageResult">-</span> kWh</div>
-                <div class="result-item">Standing Charge: £<span id="standingChargeResult">-</span></div>
-                <div class="result-item">Coffee Shop's Cost: £<span id="coffeeShopCostResult">-</span></div>
-                <div class="result-item">Flat's Cost: £<span id="flatCostResult">-</span></div>
-            </div>
-            <div class="buttons">
-                <button class="btn btn-secondary" id="generatePdfBtn">
-                    <i class="fas fa-file-pdf"></i> Generate PDF
-                </button>
-            </div>
-        </div>
-        
-        <div class="history" id="historySection">
-            <h3>Reading History</h3>
-            <p>Click on a row to load it as the previous reading.</p>
-            <table id="historyTable">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Main Meter</th>
-                        <th>Sub Meter</th>
-                        <th>Rate/kWh</th>
-                        <th>Standing Charge</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- History rows will be populated here -->
-                </tbody>
-            </table>
-            <div class="buttons">
-                <button class="btn btn-secondary" id="closeHistoryBtn">
-                    <i class="fas fa-times"></i> Close History
-                </button>
-            </div>
-        </div>
+        <main>
+            <!-- Alert messages -->
+            <div id="alertBox" class="alert hidden"></div>
+            
+            <!-- Calculator Tab -->
+            <section id="calculatorTab" class="tab-content active">
+                <div class="card">
+                    <h2 class="card-title">Previous Readings</h2>
+                    <div class="form-group">
+                        <label for="prevDate">Date:</label>
+                        <input type="text" id="prevDate" placeholder="DD-MM-YYYY" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="prevMainMeter">Main Meter (kWh):</label>
+                        <input type="text" id="prevMainMeter" readonly>
+                    </div>
+                    <div id="prevSubMetersContainer">
+                        <div class="form-group">
+                            <label for="prevSubMeter_0">Sub Meter (kWh):</label>
+                            <input type="text" id="prevSubMeter_0" readonly>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2 class="card-title">Current Readings</h2>
+                    <div class="form-group">
+                        <label for="currDate">Date:</label>
+                        <input type="text" id="currDate" placeholder="DD-MM-YYYY" pattern="\d{2}-\d{2}-\d{4}">
+                        <button id="setTodayBtn" class="icon-button" title="Set to today">
+                            <i class="fas fa-calendar-day"></i>
+                        </button>
+                    </div>
+                    <div class="form-group">
+                        <label for="currMainMeter">Main Meter (kWh):</label>
+                        <input type="number" id="currMainMeter" step="0.01" min="0">
+                    </div>
+                    <div id="currSubMetersContainer">
+                        <div class="form-group sub-meter-group">
+                            <label for="currSubMeter_0">Sub Meter (kWh):</label>
+                            <input type="number" id="currSubMeter_0" step="0.01" min="0">
+                            <input type="text" id="subMeterLabel_0" placeholder="Label (e.g., Coffee Shop)" value="Coffee Shop">
+                        </div>
+                    </div>
+                    <button id="addSubMeterBtn" class="secondary-button">
+                        <i class="fas fa-plus"></i> Add Another Sub Meter
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <h2 class="card-title">Rates</h2>
+                    <div class="form-group">
+                        <label for="ratePerKwh">Rate per kWh (pence):</label>
+                        <input type="number" id="ratePerKwh" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="standingCharge">Standing Charge (pence/day):</label>
+                        <input type="number" id="standingCharge" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="standingChargeSplit">Standing Charge Split:</label>
+                        <select id="standingChargeSplit">
+                            <option value="equal">Equal Split</option>
+                            <option value="usage">Based on Usage</option>
+                            <option value="custom">Custom Percentage</option>
+                        </select>
+                    </div>
+                    <div id="customSplitContainer" class="form-group hidden">
+                        <label for="customSplitPercentage">Main Property Share (%):</label>
+                        <input type="number" id="customSplitPercentage" min="0" max="100" value="50">
+                    </div>
+                </div>
+                
+                <div class="button-container">
+                    <button id="calculateBtn" class="primary-button">
+                        <i class="fas fa-calculator"></i> Calculate Bill
+                    </button>
+                </div>
+                
+                <div id="resultsCard" class="card hidden">
+                    <h2 class="card-title">Bill Calculation Results</h2>
+                    <div class="results-summary">
+                        <p>Period: <span id="periodDays">0</span> days</p>
+                        <p>Total Usage: <span id="totalUsage">0</span> kWh</p>
+                    </div>
+                    
+                    <table id="resultsTable" class="results-table">
+                        <thead>
+                            <tr>
+                                <th>Meter</th>
+                                <th>Usage (kWh)</th>
+                                <th>Energy Cost (£)</th>
+                                <th>Standing Charge (£)</th>
+                                <th>Total (£)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Results will be inserted here by JS -->
+                        </tbody>
+                    </table>
+                    
+                    <div class="button-container">
+                        <button id="generatePdfBtn" class="secondary-button">
+                            <i class="fas fa-file-pdf"></i> Generate PDF
+                        </button>
+                        <button id="saveReadingBtn" class="primary-button">
+                            <i class="fas fa-save"></i> Save Reading
+                        </button>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- History Tab -->
+            <section id="historyTab" class="tab-content">
+                <div class="card">
+                    <h2 class="card-title">Reading History</h2>
+                    <div class="filter-controls">
+                        <div class="form-group">
+                            <label for="historyFilter">Filter:</label>
+                            <select id="historyFilter">
+                                <option value="all">All Readings</option>
+                                <option value="lastYear">Last 12 Months</option>
+                                <option value="lastQuarter">Last 3 Months</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="table-container">
+                        <table id="historyTable" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Main Meter</th>
+                                    <th>Sub Meter(s)</th>
+                                    <th>Usage</th>
+                                    <th>Cost</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- History rows will be populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="empty-state hidden" id="historyEmptyState">
+                        <i class="fas fa-history fa-3x"></i>
+                        <p>No reading history available yet</p>
+                    </div>
+                </div>
+                
+                <div class="button-container">
+                    <button id="exportDataBtn" class="secondary-button">
+                        <i class="fas fa-download"></i> Export All Data
+                    </button>
+                    <button id="importDataBtn" class="secondary-button">
+                        <i class="fas fa-upload"></i> Import Data
+                    </button>
+                    <input type="file" id="importFileInput" accept=".json" class="hidden">
+                </div>
+            </section>
+            
+            <!-- Settings Tab -->
+            <section id="settingsTab" class="tab-content">
+                <div class="card">
+                    <h2 class="card-title">Preferences</h2>
+                    <div class="form-group">
+                        <label for="defaultRatePerKwh">Default Rate per kWh (pence):</label>
+                        <input type="number" id="defaultRatePerKwh" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="defaultStandingCharge">Default Standing Charge (pence/day):</label>
+                        <input type="number" id="defaultStandingCharge" step="0.01" min="0">
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="darkModeToggle">
+                        <label for="darkModeToggle">Dark Mode</label>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="roundedValuesToggle" checked>
+                        <label for="roundedValuesToggle">Round values in display</label>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2 class="card-title">Property Details</h2>
+                    <div class="form-group">
+                        <label for="propertyName">Property Name:</label>
+                        <input type="text" id="propertyName" placeholder="My Property">
+                    </div>
+                    <div class="form-group">
+                        <label for="propertyAddress">Address (for PDF reports):</label>
+                        <textarea id="propertyAddress" rows="3" placeholder="Optional"></textarea>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2 class="card-title">Data Management</h2>
+                    <div class="button-container">
+                        <button id="clearAllDataBtn" class="danger-button">
+                            <i class="fas fa-trash"></i> Clear All Data
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2 class="card-title">About</h2>
+                    <p>Electricity Bill Calculator v1.0</p>
+                    <p class="app-description">
+                        This app helps you calculate electricity bills when sharing a property
+                        with sub-meters. All data is stored locally on your device.
+                    </p>
+                    <p class="storage-info">
+                        Storage usage: <span id="storageUsage">Calculating...</span>
+                    </p>
+                </div>
+            </section>
+        </main>
         
         <footer>
-            <p>&copy; 2025 Peter Harding | Electricity Bill Calculator | Web Version</p>
+            <p>&copy; 2025 Electricity Bill Calculator | <a href="#" id="privacyLink">Privacy</a></p>
         </footer>
-    </div>
-
-    <script>
-        // Initialize jsPDF
-        const { jsPDF } = window.jspdf;
         
-        // DOM Elements
-        const prevDateEl = document.getElementById('prevDate');
-        const prevMainMeterEl = document.getElementById('prevMainMeter');
-        const prevSubMeterEl = document.getElementById('prevSubMeter');
-        const currDateEl = document.getElementById('currDate');
-        const currMainMeterEl = document.getElementById('currMainMeter');
-        const currSubMeterEl = document.getElementById('currSubMeter');
-        const ratePerKwhEl = document.getElementById('ratePerKwh');
-        const standingChargeEl = document.getElementById('standingCharge');
-        const calculateBtn = document.getElementById('calculateBtn');
-        const showHistoryBtn = document.getElementById('showHistoryBtn');
-        const closeHistoryBtn = document.getElementById('closeHistoryBtn');
-        const clearDataBtn = document.getElementById('clearDataBtn');
-        const generatePdfBtn = document.getElementById('generatePdfBtn');
-        const exportDataBtn = document.getElementById('exportDataBtn');
-        const importDataBtn = document.getElementById('importDataBtn');
-        const importFileInput = document.getElementById('importFileInput');
-        const resultsSection = document.getElementById('resultsSection');
-        const historySection = document.getElementById('historySection');
-        const historyTable = document.getElementById('historyTable').getElementsByTagName('tbody')[0];
-        const alertBox = document.getElementById('alertBox');
-        const backupReminderContainer = document.getElementById('backupReminderContainer');
-        
-        // Constants
-        const STORAGE_KEY = 'electricityBillData';
-        
-        // Default data
-        const defaultData = {
-            ratePerKwh: 28.0,
-            standingCharge: 140.0,
-            lastReadings: {
-                date: formatDate(new Date()),
-                mainMeter: 0.0,
-                subMeter: 0.0
-            },
-            history: [],
-            lastBackupDate: null,
-            appVersion: "1.1.0" // For future migrations
-        };
-        
-        // Current calculation results
-        let currentResults = null;
-        let appData = null;
-        
-        // Load saved data on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log("App initializing...");
-            
-            // Test localStorage availability
-            checkStorageAvailability();
-            
-            // Load data
-            appData = loadData();
-            console.log("Initial data loaded:", appData);
-            
-            // Populate form with data
-            populateForm(appData);
-            
-            // Set current date if empty
-            if (!currDateEl.value) {
-                currDateEl.value = formatDate(new Date());
-            }
-            
-            // Check if backup reminder needed
-            checkBackupReminder();
-            
-            // Add event listeners
-            setupEventListeners();
-        });
-        
-        // Check if storage is available and working
-        function checkStorageAvailability() {
-            let storageAvailable = false;
-            
-            try {
-                localStorage.setItem('test', 'test');
-                if (localStorage.getItem('test') === 'test') {
-                    localStorage.removeItem('test');
-                    storageAvailable = true;
-                }
-            } catch (e) {
-                console.error("localStorage not available:", e);
-            }
-            
-            if (!storageAvailable) {
-                showAlert("Warning: Your browser doesn't support local storage. Your data won't be saved between sessions.", "warning", 10000);
-            }
-            
-            return storageAvailable;
-        }
-        
-        // Set up all event listeners
-        function setupEventListeners() {
-            calculateBtn.addEventListener('click', calculateBill);
-            showHistoryBtn.addEventListener('click', toggleHistory);
-            closeHistoryBtn.addEventListener('click', toggleHistory);
-            clearDataBtn.addEventListener('click', confirmClearData);
-            generatePdfBtn.addEventListener('click', generatePDF);
-            exportDataBtn.addEventListener('click', exportData);
-            importDataBtn.addEventListener('click', () => importFileInput.click());
-            importFileInput.addEventListener('change', importData);
-        }
-        
-        // Format date as DD-MM-YYYY
-        function formatDate(date) {
-            const day = String(date.getDate()).padStart(2, '0');
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const year = date.getFullYear();
-            return `${day}-${month}-${year}`;
-        }
-        
-        // Load saved data from localStorage
-        function loadData() {
-            let data;
-            
-            try {
-                const storedData = localStorage.getItem(STORAGE_KEY);
-                data = storedData ? JSON.parse(storedData) : null;
-                
-                // Verify data structure
-                if (!data || !data.history || !data.lastReadings || 
-                    !data.lastReadings.date || !data.ratePerKwh || !data.standingCharge) {
-                    console.log("Data validation failed, using default data");
-                    data = {...defaultData};
-                }
-            } catch (error) {
-                console.error("Error loading data:", error);
-                data = {...defaultData};
-            }
-            
-            return data;
-        }
-        
-        // Populate form with loaded data
-        function populateForm(data) {
-            // Populate previous readings
-            prevDateEl.value = data.lastReadings.date || '';
-            prevMainMeterEl.value = data.lastReadings.mainMeter || '';
-            prevSubMeterEl.value = data.lastReadings.subMeter || '';
-            
-            // Populate rates
-            ratePerKwhEl.value = data.ratePerKwh || defaultData.ratePerKwh;
-            standingChargeEl.value = data.standingCharge || defaultData.standingCharge;
-        }
-        
-        // Save data to localStorage
-        function saveData() {
-            try {
-                // Update lastUpdated timestamp
-                appData.lastUpdated = new Date().toISOString();
-                
-                // Save to localStorage
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
-                console.log("Data saved successfully");
-                return true;
-            } catch (error) {
-                console.error("Error saving data:", error);
-                showAlert("Error saving your data. Please export your data as backup.", "error");
-                return false;
-            }
-        }
-        
-        // Validate inputs
-        function validateInputs() {
-            try {
-                // Parse dates
-                const prevDate = parseDate(prevDateEl.value);
-                const currDate = parseDate(currDateEl.value);
-                
-                if (isNaN(prevDate) || isNaN(currDate)) {
-                    showAlert("Invalid date format. Please use DD-MM-YYYY.");
-                    return false;
-                }
-                
-                if (currDate <= prevDate) {
-                    showAlert("Current date must be after previous date.");
-                    return false;
-                }
-                
-                // Parse meter readings
-                const prevMain = parseFloat(prevMainMeterEl.value);
-                const currMain = parseFloat(currMainMeterEl.value);
-                const prevSub = parseFloat(prevSubMeterEl.value);
-                const currSub = parseFloat(currSubMeterEl.value);
-                
-                if (isNaN(prevMain) || isNaN(currMain) || isNaN(prevSub) || isNaN(currSub)) {
-                    showAlert("All meter readings must be valid numbers.");
-                    return false;
-                }
-                
-                // Check meter readings are increasing
-                if (currMain <= prevMain) {
-                    showAlert("Current main meter reading must be higher than previous reading.");
-                    return false;
-                }
-                
-                if (currSub <= prevSub) {
-                    showAlert("Current sub meter reading must be higher than previous reading.");
-                    return false;
-                }
-                
-                // Check the consumption difference
-                const mainConsumption = currMain - prevMain;
-                const subConsumption = currSub - prevSub;
-                
-                if (subConsumption > mainConsumption) {
-                    showAlert("Sub meter consumption cannot be higher than main meter consumption.");
-                    return false;
-                }
-                
-                // Validate rates
-                const ratePerKwh = parseFloat(ratePerKwhEl.value);
-                const standingCharge = parseFloat(standingChargeEl.value);
-                
-                if (isNaN(ratePerKwh) || ratePerKwh <= 0 || isNaN(standingCharge) || standingCharge <= 0) {
-                    showAlert("Rates must be positive numbers.");
-                    return false;
-                }
-                
-                return true;
-            } catch (error) {
-                showAlert("Validation error: " + error.message);
-                return false;
-            }
-        }
-        
-        // Parse date string (DD-MM-YYYY) to Date object
-        function parseDate(dateString) {
-            const parts = dateString.split('-');
-            if (parts.length !== 3) return NaN;
-            
-            const day = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1; // Months are 0-indexed in JS
-            const year = parseInt(parts[2], 10);
-            
-            return new Date(year, month, day);
-        }
-        
-        // Show alert message with type (error, warning, success)
-        function showAlert(message, type = "error", duration = 5000) {
-            alertBox.textContent = message;
-            alertBox.style.display = 'block';
-            
-            // Set color based on type
-            if (type === "warning") {
-                alertBox.style.backgroundColor = "var(--warning-color)";
-                alertBox.style.color = "black";
-            } else if (type === "success") {
-                alertBox.style.backgroundColor = "var(--success-color)";
-            } else {
-                alertBox.style.backgroundColor = "var(--danger-color)";
-            }
-            
-            // Auto hide after specified duration
-            setTimeout(() => {
-                alertBox.style.display = 'none';
-            }, duration);
-        }
-        
-        // Calculate bill
-        function calculateBill() {
-            if (!validateInputs()) return;
-            
-            // Get values
-            const prevDate = parseDate(prevDateEl.value);
-            const currDate = parseDate(currDateEl.value);
-            
-            const prevMain = parseFloat(prevMainMeterEl.value);
-            const currMain = parseFloat(currMainMeterEl.value);
-            const prevSub = parseFloat(prevSubMeterEl.value);
-            const currSub = parseFloat(currSubMeterEl.value);
-            
-            const ratePerKwh = parseFloat(ratePerKwhEl.value) / 100; // Convert pence to pounds
-            const standingCharge = parseFloat(standingChargeEl.value) / 100; // Convert pence to pounds
-            
-            // Calculate
-            const days = Math.round((currDate - prevDate) / (1000 * 60 * 60 * 24));
-            const mainMeterUsage = currMain - prevMain;
-            const subMeterUsage = currSub - prevSub;
-            const coffeeShopUsage = mainMeterUsage - subMeterUsage;
-            
-            const totalStandingCharge = days * standingCharge;
-            const sharedStandingCharge = totalStandingCharge / 2;
-            
-            const coffeeShopCost = (coffeeShopUsage * ratePerKwh) + sharedStandingCharge;
-            const totalCost = (mainMeterUsage * ratePerKwh) + totalStandingCharge;
-            const flatCost = totalCost - coffeeShopCost;
-            
-            // Store results
-            currentResults = {
-                days,
-                mainMeterUsage,
-                subMeterUsage,
-                coffeeShopUsage,
-                totalStandingCharge,
-                sharedStandingCharge,
-                coffeeShopCost,
-                flatCost,
-                ratePerKwh: parseFloat(ratePerKwhEl.value),
-                standingCharge: parseFloat(standingChargeEl.value)
-            };
-            
-            // Display results
-            document.getElementById('daysResult').textContent = days;
-            document.getElementById('mainUsageResult').textContent = mainMeterUsage.toFixed(1);
-            document.getElementById('subUsageResult').textContent = subMeterUsage.toFixed(1);
-            document.getElementById('coffeeShopUsageResult').textContent = coffeeShopUsage.toFixed(1);
-            document.getElementById('standingChargeResult').textContent = totalStandingCharge.toFixed(2);
-            document.getElementById('coffeeShopCostResult').textContent = coffeeShopCost.toFixed(2);
-            document.getElementById('flatCostResult').textContent = flatCost.toFixed(2);
-            
-            // Show results section
-            resultsSection.style.display = 'block';
-            
-            // Add to history and save data
-            saveCalculation();
-        }
-        
-        // Save current calculation to history
-        function saveCalculation() {
-            // Add current reading to history
-            appData.history.push({
-                date: currDateEl.value,
-                mainMeter: parseFloat(currMainMeterEl.value),
-                subMeter: parseFloat(currSubMeterEl.value),
-                ratePerKwh: parseFloat(ratePerKwhEl.value),
-                standingCharge: parseFloat(standingChargeEl.value)
-            });
-            
-            // Update last readings for next time
-            appData.lastReadings = {
-                date: currDateEl.value,
-                mainMeter: parseFloat(currMainMeterEl.value),
-                subMeter: parseFloat(currSubMeterEl.value)
-            };
-            
-            // Update rates
-            appData.ratePerKwh = parseFloat(ratePerKwhEl.value);
-            appData.standingCharge = parseFloat(standingChargeEl.value);
-            
-            // Save updated data
-            const saveSuccessful = saveData();
-            
-            if (saveSuccessful) {
-                // Remind about backing up data occasionally
-                if (appData.history.length % 5 === 0) {
-                    showAlert("Remember to export your data regularly for safekeeping!", "warning", 6000);
-                }
-            }
-        }
-        
-        // Toggle history section
-        function toggleHistory() {
-            if (historySection.style.display === 'block') {
-                historySection.style.display = 'none';
-            } else {
-                displayHistory();
-                historySection.style.display = 'block';
-            }
-        }
-        
-        // Display history in table
-        function displayHistory() {
-            // Clear table
-            historyTable.innerHTML = '';
-            
-            if (!appData.history || appData.history.length === 0) {
-                const row = historyTable.insertRow();
-                const cell = row.insertCell();
-                cell.colSpan = 5;
-                cell.textContent = 'No history available';
-                cell.style.textAlign = 'center';
-                return;
-            }
-            
-            // Sort history by date (newest first)
-            const sortedHistory = [...appData.history].sort((a, b) => {
-                const dateA = parseDate(a.date);
-                const dateB = parseDate(b.date);
-                return dateB - dateA;
-            });
-            
-            // Add rows
-            sortedHistory.forEach(reading => {
-                const row = historyTable.insertRow();
-                
-                row.insertCell().textContent = reading.date;
-                row.insertCell().textContent = reading.mainMeter.toFixed(1);
-                row.insertCell().textContent = reading.subMeter.toFixed(1);
-                row.insertCell().textContent = reading.ratePerKwh.toFixed(2);
-                row.insertCell().textContent = reading.standingCharge.toFixed(2);
-                
-                // Add click event to load this reading as previous
-                row.addEventListener('click', () => {
-                    loadReadingAsPrevious(reading);
-                });
-            });
-        }
-        
-        // Load a reading from history as previous reading
-        function loadReadingAsPrevious(reading) {
-            // Update form fields
-            prevDateEl.value = reading.date;
-            prevMainMeterEl.value = reading.mainMeter;
-            prevSubMeterEl.value = reading.subMeter;
-            
-            // Hide history section
-            historySection.style.display = 'none';
-            
-            showAlert("Previous readings updated", "success");
-        }
-        
-        // Export data to JSON file
-        function exportData() {
-            // Add export timestamp
-            appData.exportDate = new Date().toISOString();
-            
-            // Create JSON string with formatting for readability
-            const jsonString = JSON.stringify(appData, null, 2);
-            
-            // Create blob and download link
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            
-            // Create anchor element for download
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `ElectricityBillData_${formatDate(new Date()).replace(/-/g, '')}.json`;
-            document.body.appendChild(a);
-            a.click();
-            
-            // Clean up
-            setTimeout(() => {
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            }, 100);
-            
-            // Update last backup date
-            appData.lastBackupDate = new Date().toISOString();
-            saveData();
-            
-            showAlert("Data exported successfully!", "success");
-        }
-        
-        // Import data from JSON file
-        function importData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                try {
-                    const importedData = JSON.parse(e.target.result);
-                    
-                    // Validate imported data has required structure
-                    if (!importedData.lastReadings || !importedData.history) {
-                        throw new Error("Invalid data format");
-                    }
-                    
-                    // Merge the imported data with our data structure
-                    const mergedData =
-// Merge the imported data with our data structure
-                    const mergedData = {
-                        ...defaultData,
-                        ...importedData,
-                        // Make sure we retain the latest app version
-                        appVersion: defaultData.appVersion
-                    };
-                    
-                    // Update app data
-                    appData = mergedData;
-                    
-                    // Save to storage
-                    saveData();
-                    
-                    // Refresh the form
-                    populateForm(appData);
-                    
-                    showAlert("Data imported successfully!", "success");
-                } catch (error) {
-                    console.error("Import error:", error);
-                    showAlert("Error importing data. Please check the file format.");
-                }
-                
-                // Reset file input
-                event.target.value = '';
-            };
-            
-            reader.onerror = function() {
-                showAlert("Error reading file. Please try again.");
-                event.target.value = '';
-            };
-            
-            reader.readAsText(file);
-        }
-        
-        // Confirm and clear all data
-        function confirmClearData() {
-            if (confirm("Are you sure you want to clear all saved data? This action cannot be undone.")) {
-                // Clear data in localStorage
-                localStorage.removeItem(STORAGE_KEY);
-                
-                // Reset app data to defaults
-                appData = {...defaultData};
-                
-                // Refresh the form
-                populateForm(appData);
-                
-                // Hide results and history sections
-                resultsSection.style.display = 'none';
-                historySection.style.display = 'none';
-                
-                showAlert("All data has been cleared.", "success");
-            }
-        }
-        
-        // Check if backup reminder is needed
-        function checkBackupReminder() {
-            // Only show reminder if we have history and haven't backed up recently
-            if (appData.history && appData.history.length > 2) {
-                const needsReminder = !appData.lastBackupDate || 
-                    isOlderThanMonths(new Date(appData.lastBackupDate), 1);
-                
-                if (needsReminder) {
-                    showBackupReminder();
-                }
-            }
-        }
-        
-        // Check if a date is older than the specified number of months
-        function isOlderThanMonths(date, months) {
-            const now = new Date();
-            const monthsDiff = (now.getFullYear() - date.getFullYear()) * 12 + 
-                               now.getMonth() - date.getMonth();
-            return monthsDiff >= months;
-        }
-        
-        // Show backup reminder
-        function showBackupReminder() {
-            const reminderDiv = document.createElement('div');
-            reminderDiv.className = 'backup-reminder';
-            
-            reminderDiv.innerHTML = `
-                <div>
-                    <i class="fas fa-exclamation-triangle" style="margin-right: 10px;"></i>
-                    <strong>Important:</strong> Please backup your data regularly to avoid losing your history.
+        <!-- Modal for confirmations and dialogs -->
+        <div id="modalOverlay" class="modal-overlay hidden">
+            <div id="modalContent" class="modal-content">
+                <div id="modalHeader" class="modal-header">
+                    <h3 id="modalTitle">Confirmation</h3>
+                    <button id="modalCloseBtn" class="modal-close-btn">&times;</button>
                 </div>
-                <button class="btn btn-secondary" id="backupNowBtn">
-                    <i class="fas fa-download"></i> Backup Now
-                </button>
-            `;
-            
-            backupReminderContainer.appendChild(reminderDiv);
-            
-            // Add event listener to backup button
-            document.getElementById('backupNowBtn').addEventListener('click', () => {
-                exportData();
-                reminderDiv.remove();
+                <div id="modalBody" class="modal-body">
+                    <!-- Modal content will be inserted here -->
+                </div>
+                <div id="modalFooter" class="modal-footer">
+                    <button id="modalCancelBtn" class="secondary-button">Cancel</button>
+                    <button id="modalConfirmBtn" class="primary-button">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- JavaScript modules -->
+    <script src="js/validation.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/calculator.js"></script>
+    <script src="js/pdf.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('js/service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registered:', registration);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed:', error);
+                    });
             });
-        }
-        
-        // Generate PDF with calculation details
-        function generatePDF() {
-            if (!currentResults) {
-                showAlert("Please calculate the bill first.");
-                return;
-            }
-            
-            const doc = new jsPDF();
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const margin = 20;
-            let yPos = 20;
-            
-            // Title
-            doc.setFontSize(18);
-            doc.text("Detailed Electricity Bill Calculation", pageWidth / 2, yPos, { align: "center" });
-            yPos += 15;
-            
-            // Set regular font
-            doc.setFontSize(12);
-            
-            // Dates and period
-            doc.text(`Previous reading date: ${prevDateEl.value}`, margin, yPos);
-            yPos += 8;
-            doc.text(`Current reading date: ${currDateEl.value}`, margin, yPos);
-            yPos += 8;
-            doc.text(`Days between readings: ${currentResults.days}`, margin, yPos);
-            yPos += 10;
-            
-            // Separator
-            doc.line(margin, yPos, pageWidth - margin, yPos);
-            yPos += 10;
-            
-            // Meter readings
-            doc.text(`Main meter previous reading: ${prevMainMeterEl.value} kWh`, margin, yPos);
-            yPos += 8;
-            doc.text(`Main meter current reading: ${currMainMeterEl.value} kWh`, margin, yPos);
-            yPos += 8;
-            doc.text(`Sub meter previous reading: ${prevSubMeterEl.value} kWh`, margin, yPos);
-            yPos += 8;
-            doc.text(`Sub meter current reading: ${currSubMeterEl.value} kWh`, margin, yPos);
-            yPos += 10;
-            
-            // Separator
-            doc.line(margin, yPos, pageWidth - margin, yPos);
-            yPos += 10;
-            
-            // Usage
-            doc.text(`Main meter usage: ${currentResults.mainMeterUsage.toFixed(1)} kWh`, margin, yPos);
-            yPos += 8;
-            doc.text(`Sub meter usage: ${currentResults.subMeterUsage.toFixed(1)} kWh`, margin, yPos);
-            yPos += 8;
-            doc.text(`Coffee Shop's electricity usage: ${currentResults.coffeeShopUsage.toFixed(1)} kWh`, margin, yPos);
-            yPos += 10;
-            
-            // Separator
-            doc.line(margin, yPos, pageWidth - margin, yPos);
-            yPos += 10;
-            
-            // Rates and charges
-            doc.text(`Rate per kWh: £${(currentResults.ratePerKwh / 100).toFixed(2)}`, margin, yPos);
-            yPos += 8;
-            doc.text(`Daily standing charge: £${(currentResults.standingCharge / 100).toFixed(2)} per day`, margin, yPos);
-            yPos += 8;
-            doc.text(`Total standing charge for period: £${currentResults.totalStandingCharge.toFixed(2)}`, margin, yPos);
-            yPos += 8;
-            doc.text(`Shared standing charge (Coffee Shop & Flat): £${currentResults.sharedStandingCharge.toFixed(2)} each`, margin, yPos);
-            yPos += 10;
-            
-            // Separator
-            doc.line(margin, yPos, pageWidth - margin, yPos);
-            yPos += 10;
-            
-            // Final costs
-            doc.text(`Coffee Shop's cost (kWh usage + shared standing charge): £${currentResults.coffeeShopCost.toFixed(2)}`, margin, yPos);
-            yPos += 8;
-            doc.text(`Flat's cost (Total cost - Coffee Shop's cost): £${currentResults.flatCost.toFixed(2)}`, margin, yPos);
-            
-            // Generate filename based on current date and add timestamp for uniqueness
-            const timestamp = new Date().toISOString().replace(/[-:.TZ]/g, '').substring(0, 14);
-            const filename = `ElectricityBill_${currDateEl.value.replace(/-/g, '')}_${timestamp}.pdf`;
-            
-            // Save PDF
-            doc.save(filename);
-            
-            showAlert("PDF generated successfully!", "success");
         }
     </script>
 </body>
 </html>
-<!-- Version: 1.1.0 - Fixed Safari compatibility issues -->
