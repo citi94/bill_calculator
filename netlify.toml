@@ -6,3 +6,9 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[dev]
+  publish = "."
+  port = 9000       # This is the external port (different from coffee_orders)
+  targetPort = 4000 # This is the internal port (different from 3999)
+  framework = "#static"
