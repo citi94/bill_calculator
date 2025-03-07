@@ -744,5 +744,5 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize the application
     init();
-    }, 500); // Increased delay to ensure scripts are fully loaded
+    }, 500); // Incrreased delay to ensure scripts are fully loaded
 });
