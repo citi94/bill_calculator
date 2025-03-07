@@ -1749,15 +1749,68 @@ const UI = (function() {
     function switchTab(tabId) {
         console.log(`Switching to tab: ${tabId}`);
         
+        // Fallback if elements are missing
         if (!elements.tabButtons || !elements.tabContents) {
-            console.warn('Tab elements not available');
+            console.warn('Tab elements not available, trying direct DOM access');
+            
+            // Direct DOM access as fallback
+            const allTabButtons = document.querySelectorAll('.tab-button, [role="tab"], button');
+            const allTabContents = document.querySelectorAll('.tab-content, [role="tabpanel"], section');
+            
+            // Find button by content or ID
+            let targetButton = null;
+            let targetContent = null;
+            
+            switch(tabId) {
+                case 'calculatorTab':
+                    targetButton = Array.from(allTabButtons).find(btn => 
+                        btn.textContent.includes('Calculator') || btn.id.includes('Calculator'));
+                    targetContent = document.getElementById('calculatorTab') || 
+                        Array.from(allTabContents).find(content => content.id.includes('calculator'));
+                    break;
+                case 'historyTab':
+                    targetButton = Array.from(allTabButtons).find(btn => 
+                        btn.textContent.includes('History') || btn.id.includes('History'));
+                    targetContent = document.getElementById('historyTab') || 
+                        Array.from(allTabContents).find(content => content.id.includes('history'));
+                    break;
+                case 'settingsTab':
+                    targetButton = Array.from(allTabButtons).find(btn => 
+                        btn.textContent.includes('Settings') || btn.id.includes('Settings'));
+                    targetContent = document.getElementById('settingsTab') || 
+                        Array.from(allTabContents).find(content => content.id.includes('settings'));
+                    break;
+            }
+            
+            // Update active classes
+            if (targetButton) {
+                allTabButtons.forEach(btn => btn.classList.remove('active'));
+                targetButton.classList.add('active');
+            }
+            
+            if (targetContent) {
+                allTabContents.forEach(content => content.classList.remove('active'));
+                targetContent.classList.add('active');
+            }
+            
+            // Update state
+            state.currentTab = tabId;
+            
+            // Handle special tab behaviors
+            if (tabId === 'historyTab' && eventHandlers.onHistoryTabSelected) {
+                eventHandlers.onHistoryTabSelected();
+            } else if (tabId === 'settingsTab' && eventHandlers.onSettingsTabSelected) {
+                eventHandlers.onSettingsTabSelected();
+            }
+            
             return;
         }
         
-        // Update active class on tab buttons
+        // Regular tab switching with cached elements
         elements.tabButtons.forEach(button => {
             if (button) {
-                if (button.id === tabId.replace('Tab', '')) {
+                if (button.id === tabId.replace('Tab', '') || 
+                    button.textContent.trim().toLowerCase() === tabId.replace('Tab', '').toLowerCase()) {
                     button.classList.add('active');
                 } else {
                     button.classList.remove('active');
@@ -1765,7 +1818,6 @@ const UI = (function() {
             }
         });
         
-        // Update active class on tab contents
         elements.tabContents.forEach(content => {
             if (content) {
                 if (content.id === tabId) {
@@ -2588,6 +2640,176 @@ const UI = (function() {
     function disableDarkMode() {
         document.body.classList.remove('dark-theme');
     }
+    function showFirstTimeSetup() {
+        // Create a modal for first-time setup
+        if (!elements.modalTitle || !elements.modalBody || !elements.modalConfirmBtn || !elements.modalOverlay) {
+            console.error('Modal elements not found');
+            return;
+        }
+        
+        // Set title
+        elements.modalTitle.textContent = 'Welcome to Electricity Bill Calculator';
+        
+        // Create form content
+        elements.modalBody.innerHTML = `
+            <div class="first-time-setup">
+                <p>It looks like this is your first time using the app. Please enter your initial meter readings:</p>
+                
+                <div class="form-group">
+                    <label for="initialDate">Initial Reading Date:</label>
+                    <input type="text" id="initialDate" placeholder="DD-MM-YYYY" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label for="initialMainMeter">Main Meter Reading (kWh):</label>
+                    <input type="number" id="initialMainMeter" step="0.01" min="0" class="form-control">
+                </div>
+                
+                <div id="initialSubMetersContainer">
+                    <div class="form-group">
+                        <label for="initialSubMeter_0">Sub Meter Reading (kWh):</label>
+                        <input type="number" id="initialSubMeter_0" step="0.01" min="0" class="form-control">
+                        <input type="text" id="initialSubMeterLabel_0" placeholder="Label (e.g., Coffee Shop)" value="Coffee Shop">
+                    </div>
+                </div>
+                
+                <button id="addInitialSubMeterBtn" class="secondary-button">
+                    <i class="fas fa-plus"></i> Add Another Sub Meter
+                </button>
+            </div>
+        `;
+        
+        // Set button text
+        elements.modalConfirmBtn.textContent = 'Save Initial Readings';
+        elements.modalCancelBtn.textContent = 'Use Default Values';
+        
+        // Set up event listeners
+        const addInitialSubMeterBtn = document.getElementById('addInitialSubMeterBtn');
+        if (addInitialSubMeterBtn) {
+            addInitialSubMeterBtn.addEventListener('click', addInitialSubMeterField);
+        }
+        
+        // Set today's date in the initial date field
+        const initialDateField = document.getElementById('initialDate');
+        if (initialDateField) {
+            const today = new Date();
+            const day = String(today.getDate()).padStart(2, '0');
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const year = today.getFullYear();
+            initialDateField.value = `${day}-${month}-${year}`;
+        }
+        
+        // Set confirm button action
+        elements.modalConfirmBtn.onclick = () => {
+            const initialData = getInitialReadingsData();
+            closeModal();
+            if (eventHandlers.onFirstTimeSetupCompleted) {
+                eventHandlers.onFirstTimeSetupCompleted(initialData);
+            }
+        };
+        
+        // Set cancel button action
+        elements.modalCancelBtn.onclick = () => {
+            closeModal();
+            if (eventHandlers.onFirstTimeSetupSkipped) {
+                eventHandlers.onFirstTimeSetupSkipped();
+            }
+        };
+        
+        // Show modal
+        elements.modalOverlay.classList.remove('hidden');
+    }
+    
+    function addInitialSubMeterField() {
+        const container = document.getElementById('initialSubMetersContainer');
+        if (!container) return;
+        
+        // Count existing sub meters
+        const subMeterCount = container.querySelectorAll('.form-group').length;
+        
+        // Create new sub meter field
+        const subMeterGroup = document.createElement('div');
+        subMeterGroup.className = 'form-group';
+        subMeterGroup.innerHTML = `
+            <label for="initialSubMeter_${subMeterCount}">Sub Meter Reading (kWh):</label>
+            <input type="number" id="initialSubMeter_${subMeterCount}" step="0.01" min="0" class="form-control">
+            <input type="text" id="initialSubMeterLabel_${subMeterCount}" placeholder="Label">
+            <button class="icon-button remove-initial-submeter-btn" data-index="${subMeterCount}" title="Remove">
+                <i class="fas fa-trash"></i>
+            </button>
+        `;
+        
+        // Add to container
+        container.appendChild(subMeterGroup);
+        
+        // Add event listener to remove button
+        const removeBtn = subMeterGroup.querySelector('.remove-initial-submeter-btn');
+        if (removeBtn) {
+            removeBtn.addEventListener('click', function() {
+                const index = this.getAttribute('data-index');
+                const group = document.getElementById(`initialSubMeter_${index}`).closest('.form-group');
+                if (group) group.remove();
+            });
+        }
+    }
+    
+    function getInitialReadingsData() {
+        const initialDate = document.getElementById('initialDate')?.value || '';
+        const initialMainMeter = document.getElementById('initialMainMeter')?.value || '';
+        const container = document.getElementById('initialSubMetersContainer');
+        
+        const subMeters = [];
+        const subMeterLabels = [];
+        
+        if (container) {
+            const subMeterGroups = container.querySelectorAll('.form-group');
+            subMeterGroups.forEach((group, index) => {
+                const subMeterInput = document.getElementById(`initialSubMeter_${index}`);
+                const subMeterLabelInput = document.getElementById(`initialSubMeterLabel_${index}`);
+                
+                if (subMeterInput) {
+                    subMeters.push(subMeterInput.value || '0');
+                }
+                
+                if (subMeterLabelInput) {
+                    subMeterLabels.push(subMeterLabelInput.value || `Sub Meter ${index+1}`);
+                }
+            });
+        }
+        
+        return {
+            date: initialDate,
+            mainMeter: initialMainMeter,
+            subMeters: subMeters,
+            subMeterLabels: subMeterLabels
+        };
+    }
+    
+    function addNewReadingCycleButton() {
+        // Find a good place to add the button
+        const calculateBtn = document.getElementById('calculateBtn');
+        if (!calculateBtn) return;
+        
+        // Check if button already exists
+        if (document.getElementById('newReadingCycleBtn')) return;
+        
+        // Create new button
+        const newBtn = document.createElement('button');
+        newBtn.id = 'newReadingCycleBtn';
+        newBtn.className = 'secondary-button';
+        newBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Start New Reading Cycle';
+        newBtn.style.marginRight = '10px';
+        
+        // Add event listener
+        newBtn.addEventListener('click', () => {
+            if (eventHandlers.onNewReadingCycleClicked) {
+                eventHandlers.onNewReadingCycleClicked();
+            }
+        });
+        
+        // Insert before calculate button
+        calculateBtn.parentElement.insertBefore(newBtn, calculateBtn);
+    }
     
     function on(event, handler) {
         eventHandlers[event] = handler;
@@ -2599,19 +2821,23 @@ const UI = (function() {
     }
     
     // Return public methods
-    return {
-        init,
-        on,
-        setFormData,
-        displayCalculationResult,
-        displayReadingHistory,
-        updateSettingsUI,
-        updateStorageUsage,
-        showAlert,
-        showConfirmationModal,
-        showReadingDetailsModal,
-        switchTab
-    };
+return {
+    init,
+    on,
+    setFormData,
+    displayCalculationResult,
+    displayReadingHistory,
+    updateSettingsUI,
+    updateStorageUsage,
+    showAlert,
+    showConfirmationModal,
+    showReadingDetailsModal,
+    switchTab,
+    showFirstTimeSetup,
+    addInitialSubMeterField,
+    getInitialReadingsData,
+    addNewReadingCycleButton
+};
 })();
 
 // Make UI available globally
@@ -2770,6 +2996,10 @@ document.addEventListener('DOMContentLoaded', function() {
         UI.on('onPropertyNameChanged', savePropertyName);
         UI.on('onPropertyAddressChanged', savePropertyAddress);
         UI.on('onClearAllDataConfirmed', clearAllData);
+        // Add new event handlers
+    UI.on('onFirstTimeSetupCompleted', handleFirstTimeSetupCompleted);
+    UI.on('onFirstTimeSetupSkipped', handleFirstTimeSetupSkipped);
+    UI.on('onNewReadingCycleClicked', handleNewReadingCycle);
     }
     
     /**
@@ -2792,9 +3022,16 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     async function loadMostRecentReading() {
         try {
-            const mostRecentReading = await BillStorageManager.getMostRecentReading();
+            const readings = await BillStorageManager.getAllReadings();
             
-            if (mostRecentReading) {
+            if (readings && readings.length > 0) {
+                // Sort readings by date (newest first)
+                readings.sort((a, b) => {
+                    return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+                });
+                
+                const mostRecentReading = readings[0];
+                
                 // Set form data with values from the most recent reading
                 UI.setFormData({
                     prevDate: mostRecentReading.date,
@@ -2806,10 +3043,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     customSplitPercentage: mostRecentReading.rates ? mostRecentReading.rates.customSplitPercentage : 50,
                     subMeterLabels: mostRecentReading.subMeterLabels
                 });
+                
+                // Add New Reading Cycle button
+                UI.addNewReadingCycleButton();
+            } else {
+                // No readings found, show first-time setup
+                setTimeout(() => {
+                    UI.showFirstTimeSetup();
+                }, 500);
             }
         } catch (error) {
             console.error('Error loading most recent reading:', error);
             UI.showAlert('Error loading previous readings.', 'warning');
+            
+            // Show first-time setup as fallback
+            setTimeout(() => {
+                UI.showFirstTimeSetup();
+            }, 500);
         }
     }
     
@@ -3369,4 +3619,153 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Error updating storage usage:', error);
         }
     }
+/**
+ * Handle first-time setup completion
+ * @param {Object} initialData Initial readings data
+ */
+async function handleFirstTimeSetupCompleted(initialData) {
+    try {
+        // Validate the data
+        if (!initialData.date || !initialData.mainMeter) {
+            UI.showAlert('Initial readings must include date and main meter reading.', 'warning');
+            return;
+        }
+        
+        // Create an initial reading entry
+        const initialReading = {
+            date: initialData.date,
+            mainMeter: parseFloat(initialData.mainMeter),
+            subMeters: initialData.subMeters.map(val => parseFloat(val)),
+            subMeterLabels: initialData.subMeterLabels,
+            timestamp: new Date().getTime()
+        };
+        
+        // Save the initial reading
+        await BillStorageManager.saveReading(initialReading);
+        
+        // Set as previous reading
+        UI.setFormData({
+            prevDate: initialData.date,
+            prevMain: initialData.mainMeter,
+            prevSub: initialData.subMeters,
+            subMeterLabels: initialData.subMeterLabels,
+            ratePerKwh: appSettings.defaultRatePerKwh,
+            standingCharge: appSettings.defaultStandingCharge
+        });
+        
+        // Add New Reading Cycle button
+        UI.addNewReadingCycleButton();
+        
+        UI.showAlert('Initial readings saved. You can now enter your current readings.', 'success');
+    } catch (error) {
+        console.error('Error handling initial setup:', error);
+        UI.showAlert('Error saving initial readings.', 'danger');
+    }
+}
+
+/**
+ * Handle first-time setup skipped
+ */
+async function handleFirstTimeSetupSkipped() {
+    try {
+        // Create default initial readings
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, '0');
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const year = today.getFullYear();
+        
+        const initialReading = {
+            date: `${day}-${month}-${year}`,
+            mainMeter: 1000,
+            subMeters: [500],
+            subMeterLabels: ['Coffee Shop'],
+            timestamp: new Date().getTime()
+        };
+        
+        // Save the initial reading
+        await BillStorageManager.saveReading(initialReading);
+        
+        // Set as previous reading
+        UI.setFormData({
+            prevDate: initialReading.date,
+            prevMain: initialReading.mainMeter,
+            prevSub: initialReading.subMeters,
+            subMeterLabels: initialReading.subMeterLabels,
+            ratePerKwh: appSettings.defaultRatePerKwh,
+            standingCharge: appSettings.defaultStandingCharge
+        });
+        
+        // Add New Reading Cycle button
+        UI.addNewReadingCycleButton();
+        
+        UI.showAlert('Default initial readings set. You can now enter your current readings.', 'success');
+    } catch (error) {
+        console.error('Error setting default readings:', error);
+        UI.showAlert('Error setting default readings.', 'danger');
+    }
+}
+
+/**
+ * Handle new reading cycle
+ */
+function handleNewReadingCycle() {
+    UI.showConfirmationModal(
+        'Start New Reading Cycle',
+        'This will use your most recent readings as the starting point for a new cycle. Continue?',
+        async () => {
+            try {
+                // Get most recent reading
+                const mostRecentReading = await BillStorageManager.getMostRecentReading();
+                
+                if (!mostRecentReading) {
+                    UI.showAlert('No previous readings found.', 'warning');
+                    return;
+                }
+                
+                // Set form data with values from the most recent reading
+                UI.setFormData({
+                    prevDate: mostRecentReading.date,
+                    prevMain: mostRecentReading.mainMeter,
+                    prevSub: mostRecentReading.subMeters,
+                    subMeterLabels: mostRecentReading.subMeterLabels,
+                    ratePerKwh: mostRecentReading.rates ? mostRecentReading.rates.ratePerKwh : appSettings.defaultRatePerKwh,
+                    standingCharge: mostRecentReading.rates ? mostRecentReading.rates.standingCharge : appSettings.defaultStandingCharge,
+                    standingChargeSplit: mostRecentReading.rates ? mostRecentReading.rates.standingChargeSplit : 'equal',
+                    customSplitPercentage: mostRecentReading.rates ? mostRecentReading.rates.customSplitPercentage : 50
+                });
+                
+                // Clear current readings
+                const currDateInput = document.getElementById('currDate');
+                const currMainMeterInput = document.getElementById('currMainMeter');
+                
+                if (currDateInput) {
+                    const today = new Date();
+                    const day = String(today.getDate()).padStart(2, '0');
+                    const month = String(today.getMonth() + 1).padStart(2, '0');
+                    const year = today.getFullYear();
+                    currDateInput.value = `${day}-${month}-${year}`;
+                }
+                
+                if (currMainMeterInput) currMainMeterInput.value = '';
+                
+                // Clear sub meter readings
+                for (let i = 0; i < state.subMeterCount; i++) {
+                    const currSubMeter = document.getElementById(`currSubMeter_${i}`);
+                    if (currSubMeter) currSubMeter.value = '';
+                }
+                
+                // Hide results if visible
+                const resultsCard = document.getElementById('resultsCard');
+                if (resultsCard) resultsCard.classList.add('hidden');
+                
+                currentCalculation = null;
+                
+                UI.showAlert('New reading cycle started.', 'success');
+            } catch (error) {
+                console.error('Error starting new reading cycle:', error);
+                UI.showAlert('Error starting new reading cycle.', 'danger');
+            }
+        }
+    );
+}
 });
