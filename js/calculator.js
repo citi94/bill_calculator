@@ -255,3 +255,6 @@ const BillCalculator = (function() {
         calculateStandingCharge
     };
 })();
+
+// Make BillCalculator available globally
+window.BillCalculator = BillCalculator;

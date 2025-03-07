@@ -5,6 +5,42 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Ensure all DOM elements are fully loaded before accessing them
+    setTimeout(function() {
+        // Check if all required JavaScript objects are available
+        if (!window.BillValidator) {
+            console.error('BillValidator is not defined. Make sure validation.js is loaded correctly.');
+            alert('Error: Required JavaScript components are missing. Please check the console for details.');
+            return;
+        }
+        
+        if (!window.BillStorageManager) {
+            console.error('BillStorageManager is not defined. Make sure storage.js is loaded correctly.');
+            alert('Error: Required JavaScript components are missing. Please check the console for details.');
+            return;
+        }
+        
+        if (!window.BillCalculator) {
+            console.error('BillCalculator is not defined. Make sure calculator.js is loaded correctly.');
+            alert('Error: Required JavaScript components are missing. Please check the console for details.');
+            return;
+        }
+        
+        if (!window.PDFGenerator) {
+            console.error('PDFGenerator is not defined. Make sure pdf.js is loaded correctly.');
+            alert('Error: Required JavaScript components are missing. Please check the console for details.');
+            return;
+        }
+        
+        if (!window.UI) {
+            console.error('UI is not defined. Make sure ui.js is loaded correctly.');
+            alert('Error: Required JavaScript components are missing. Please check the console for details.');
+            return;
+        }
+        
+        // All required objects are available, proceed with initialization
+        console.log('All required JavaScript components are loaded.');
+
     // State variables
     let currentCalculation = null;
     let appSettings = {
@@ -19,43 +55,63 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize the application
     async function init() {
         try {
-            // Initialize storage
-            await StorageManager.init();
+            console.log('Initializing application...');
             
-            // Load settings
-            await loadSettings();
-            
-            // Initialize UI with settings
+            // Initialize UI with default settings first
             UI.init({
-                darkMode: appSettings.darkMode,
-                roundedValues: appSettings.roundedValues
+                darkMode: false,
+                roundedValues: true
             });
+            
+            // Then initialize storage
+            await BillStorageManager.init();
+            console.log('Storage initialized');
+            
+            // Load settings from storage
+            await loadSettings();
+            console.log('Settings loaded');
+            
+            // Now update UI with loaded settings
+            UI.updateSettingsUI(appSettings);
             
             // Set up event handlers
             setupEventHandlers();
+            console.log('Event handlers set up');
             
             // Load most recent readings as previous readings
             await loadMostRecentReading();
+            console.log('Most recent reading loaded');
             
             // Set default rate values
-            document.getElementById('ratePerKwh').value = appSettings.defaultRatePerKwh;
-            document.getElementById('standingCharge').value = appSettings.defaultStandingCharge;
+            const rateElement = document.getElementById('ratePerKwh');
+            const standingChargeElement = document.getElementById('standingCharge');
+            
+            if (rateElement) rateElement.value = appSettings.defaultRatePerKwh;
+            if (standingChargeElement) standingChargeElement.value = appSettings.defaultStandingCharge;
             
             // Update storage usage display
             updateStorageUsage();
             
             // Set default date
             const dateInput = document.getElementById('currDate');
-            if (!dateInput.value) {
+            if (dateInput && !dateInput.value) {
                 const today = new Date();
                 const day = String(today.getDate()).padStart(2, '0');
                 const month = String(today.getMonth() + 1).padStart(2, '0');
                 const year = today.getFullYear();
                 dateInput.value = `${day}-${month}-${year}`;
             }
+            
+            console.log('Application initialization complete');
         } catch (error) {
             console.error('Initialization error:', error);
-            UI.showAlert('Error initializing the application. Please try refreshing the page.', 'danger');
+            // Try to show alert, but use vanilla JS as fallback
+            try {
+                UI.showAlert('Error initializing the application. Please try refreshing the page.', 'danger');
+            } catch (e) {
+                console.error('Could not show UI alert:', e);
+                alert('Error initializing the application. Please try refreshing the page.');
+            }
         }
     }
     
@@ -93,12 +149,12 @@ document.addEventListener('DOMContentLoaded', function() {
      * Load application settings from storage
      */
     async function loadSettings() {
-        appSettings.darkMode = await StorageManager.getSetting('darkMode', false);
-        appSettings.roundedValues = await StorageManager.getSetting('roundedValues', true);
-        appSettings.defaultRatePerKwh = await StorageManager.getSetting('defaultRatePerKwh', 28.0);
-        appSettings.defaultStandingCharge = await StorageManager.getSetting('defaultStandingCharge', 140.0);
-        appSettings.propertyName = await StorageManager.getSetting('propertyName', 'My Property');
-        appSettings.propertyAddress = await StorageManager.getSetting('propertyAddress', '');
+        appSettings.darkMode = await BillStorageManager.getSetting('darkMode', false);
+        appSettings.roundedValues = await BillStorageManager.getSetting('roundedValues', true);
+        appSettings.defaultRatePerKwh = await BillStorageManager.getSetting('defaultRatePerKwh', 28.0);
+        appSettings.defaultStandingCharge = await BillStorageManager.getSetting('defaultStandingCharge', 140.0);
+        appSettings.propertyName = await BillStorageManager.getSetting('propertyName', 'My Property');
+        appSettings.propertyAddress = await BillStorageManager.getSetting('propertyAddress', '');
         
         // Update settings UI
         UI.updateSettingsUI(appSettings);
@@ -109,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     async function loadMostRecentReading() {
         try {
-            const mostRecentReading = await StorageManager.getMostRecentReading();
+            const mostRecentReading = await BillStorageManager.getMostRecentReading();
             
             if (mostRecentReading) {
                 // Set form data with values from the most recent reading
@@ -136,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function handleCalculation(formData) {
         // Validate form data
-        const validationResult = Validator.validateReadingSet(formData);
+        const validationResult = BillValidator.validateReadingSet(formData);
         
         if (!validationResult.isValid) {
             // Show validation errors
@@ -212,7 +268,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const readingEntry = BillCalculator.createReadingHistoryEntry(currentCalculation);
             
             // Save to storage
-            await StorageManager.saveReading(readingEntry);
+            await BillStorageManager.saveReading(readingEntry);
             
             UI.showAlert('Reading saved successfully.', 'success');
         } catch (error) {
@@ -226,7 +282,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     async function loadReadingHistory() {
         try {
-            const readings = await StorageManager.getAllReadings();
+            const readings = await BillStorageManager.getAllReadings();
             const filter = document.getElementById('historyFilter').value;
             
             UI.displayReadingHistory(readings, filter);
@@ -311,7 +367,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     async function deleteReading(readingId) {
         try {
-            await StorageManager.deleteReading(parseInt(readingId));
+            await BillStorageManager.deleteReading(parseInt(readingId));
             
             // Reload reading history
             await loadReadingHistory();
@@ -329,7 +385,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function exportData() {
         try {
             // Get all data from storage
-            const data = await StorageManager.exportData();
+            const data = await BillStorageManager.exportData();
             
             // Convert to JSON string
             const jsonString = JSON.stringify(data, null, 2);
@@ -374,7 +430,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const data = JSON.parse(fileText);
                         
                         // Import data
-                        await StorageManager.importData(data);
+                        await BillStorageManager.importData(data);
                         
                         // Reload settings
                         await loadSettings();
@@ -510,7 +566,7 @@ document.addEventListener('DOMContentLoaded', function() {
             appSettings.darkMode = enabled;
             
             // Save to storage
-            await StorageManager.saveSetting('darkMode', enabled);
+            await BillStorageManager.saveSetting('darkMode', enabled);
         } catch (error) {
             console.error('Error saving dark mode setting:', error);
             UI.showAlert('Error saving setting.', 'danger');
@@ -527,7 +583,7 @@ document.addEventListener('DOMContentLoaded', function() {
             appSettings.roundedValues = enabled;
             
             // Save to storage
-            await StorageManager.saveSetting('roundedValues', enabled);
+            await BillStorageManager.saveSetting('roundedValues', enabled);
             
             // Update calculation display if available
             if (currentCalculation) {
@@ -561,7 +617,7 @@ document.addEventListener('DOMContentLoaded', function() {
             appSettings.defaultRatePerKwh = rate;
             
             // Save to storage
-            await StorageManager.saveSetting('defaultRatePerKwh', rate);
+            await BillStorageManager.saveSetting('defaultRatePerKwh', rate);
         } catch (error) {
             console.error('Error saving default rate:', error);
             UI.showAlert('Error saving setting.', 'danger');
@@ -584,7 +640,7 @@ document.addEventListener('DOMContentLoaded', function() {
             appSettings.defaultStandingCharge = charge;
             
             // Save to storage
-            await StorageManager.saveSetting('defaultStandingCharge', charge);
+            await BillStorageManager.saveSetting('defaultStandingCharge', charge);
         } catch (error) {
             console.error('Error saving default standing charge:', error);
             UI.showAlert('Error saving setting.', 'danger');
@@ -601,7 +657,7 @@ document.addEventListener('DOMContentLoaded', function() {
             appSettings.propertyName = name;
             
             // Save to storage
-            await StorageManager.saveSetting('propertyName', name);
+            await BillStorageManager.saveSetting('propertyName', name);
         } catch (error) {
             console.error('Error saving property name:', error);
             UI.showAlert('Error saving setting.', 'danger');
@@ -618,7 +674,7 @@ document.addEventListener('DOMContentLoaded', function() {
             appSettings.propertyAddress = address;
             
             // Save to storage
-            await StorageManager.saveSetting('propertyAddress', address);
+            await BillStorageManager.saveSetting('propertyAddress', address);
         } catch (error) {
             console.error('Error saving property address:', error);
             UI.showAlert('Error saving setting.', 'danger');
@@ -631,7 +687,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function clearAllData() {
         try {
             // Clear all data from storage
-            await StorageManager.clearAllData();
+            await BillStorageManager.clearAllData();
             
             // Reset app settings to defaults
             appSettings = {
@@ -679,7 +735,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     async function updateStorageUsage() {
         try {
-            const usageInBytes = await StorageManager.getStorageUsage();
+            const usageInBytes = await BillStorageManager.getStorageUsage();
             UI.updateStorageUsage(usageInBytes);
         } catch (error) {
             console.error('Error updating storage usage:', error);
@@ -688,4 +744,5 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize the application
     init();
+    }, 500); // Increased delay to ensure scripts are fully loaded
 });

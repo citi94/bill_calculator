@@ -347,3 +347,6 @@ const PDFGenerator = (function() {
         generateSummaryPDF
     };
 })();
+
+// Make PDFGenerator available globally
+window.PDFGenerator = PDFGenerator;

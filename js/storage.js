@@ -5,7 +5,7 @@
  * This module provides an abstraction layer for data storage
  */
 
-const StorageManager = (function() {
+const BillStorageManager = (function() {
     // Database configuration
     const DB_NAME = 'ElectricityBillCalculator';
     const DB_VERSION = 1;

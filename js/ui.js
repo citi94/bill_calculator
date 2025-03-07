@@ -24,26 +24,37 @@ const UI = (function() {
      * @param {Object} initialState Initial UI state
      */
     function init(initialState = {}) {
+        console.log('Initializing UI...');
         // Merge with provided initial state
         state = { ...state, ...initialState };
         
-        // Cache DOM elements
-        cacheElements();
-        
-        // Attach event listeners
-        attachEventListeners();
-        
-        // Initialize tabs
-        initTabs();
-        
-        // Set dark mode if enabled
-        if (state.darkMode) {
-            enableDarkMode();
-        }
-        
-        // Initialize sub-meter container
-        for (let i = 1; i < state.subMeterCount; i++) {
-            addSubMeterFields();
+        try {
+            // Cache DOM elements
+            cacheElements();
+            
+            // Attach event listeners
+            attachEventListeners();
+            
+            // Initialize tabs
+            initTabs();
+            
+            // Set dark mode if enabled
+            if (state.darkMode) {
+                enableDarkMode();
+            }
+            
+            // Initialize sub-meter container
+            try {
+                for (let i = 1; i < state.subMeterCount; i++) {
+                    addSubMeterFields();
+                }
+            } catch (e) {
+                console.warn('Error initializing sub-meters:', e);
+            }
+            
+            console.log('UI initialization complete');
+        } catch (error) {
+            console.error('UI initialization error:', error);
         }
     }
     
@@ -51,77 +62,136 @@ const UI = (function() {
      * Cache commonly used DOM elements
      */
     function cacheElements() {
+        console.log('Caching DOM elements...');
+        
+        // Safely get elements with fallbacks
+        const safeGetElement = (id) => {
+            const element = document.getElementById(id);
+            if (!element) {
+                console.warn(`Element with ID '${id}' not found in DOM`);
+            }
+            return element;
+        };
+        
+        const safeQuerySelector = (selector) => {
+            try {
+                return document.querySelector(selector);
+            } catch (e) {
+                console.warn(`Selector '${selector}' caused an error:`, e);
+                return null;
+            }
+        };
+        
+        const safeQuerySelectorAll = (selector) => {
+            try {
+                return document.querySelectorAll(selector);
+            } catch (e) {
+                console.warn(`Selector '${selector}' caused an error:`, e);
+                return [];
+            }
+        };
+        
         // Tab navigation
-        elements.tabButtons = document.querySelectorAll('.tab-button');
-        elements.tabContents = document.querySelectorAll('.tab-content');
+        elements.tabButtons = safeQuerySelectorAll('.tab-button');
+        elements.tabContents = safeQuerySelectorAll('.tab-content');
         
         // Calculator tab
-        elements.calculatorTab = document.getElementById('calculatorTab');
-        elements.prevDate = document.getElementById('prevDate');
-        elements.prevMainMeter = document.getElementById('prevMainMeter');
-        elements.prevSubMetersContainer = document.getElementById('prevSubMetersContainer');
-        elements.currDate = document.getElementById('currDate');
-        elements.currMainMeter = document.getElementById('currMainMeter');
-        elements.currSubMetersContainer = document.getElementById('currSubMetersContainer');
-        elements.ratePerKwh = document.getElementById('ratePerKwh');
-        elements.standingCharge = document.getElementById('standingCharge');
-        elements.standingChargeSplit = document.getElementById('standingChargeSplit');
-        elements.customSplitContainer = document.getElementById('customSplitContainer');
-        elements.customSplitPercentage = document.getElementById('customSplitPercentage');
-        elements.setTodayBtn = document.getElementById('setTodayBtn');
-        elements.addSubMeterBtn = document.getElementById('addSubMeterBtn');
-        elements.calculateBtn = document.getElementById('calculateBtn');
-        elements.generatePdfBtn = document.getElementById('generatePdfBtn');
-        elements.saveReadingBtn = document.getElementById('saveReadingBtn');
-        elements.resultsCard = document.getElementById('resultsCard');
-        elements.resultsTable = document.getElementById('resultsTable').querySelector('tbody');
-        elements.periodDays = document.getElementById('periodDays');
-        elements.totalUsage = document.getElementById('totalUsage');
+        elements.calculatorTab = safeGetElement('calculatorTab');
+        elements.prevDate = safeGetElement('prevDate');
+        elements.prevMainMeter = safeGetElement('prevMainMeter');
+        elements.prevSubMetersContainer = safeGetElement('prevSubMetersContainer');
+        elements.currDate = safeGetElement('currDate');
+        elements.currMainMeter = safeGetElement('currMainMeter');
+        elements.currSubMetersContainer = safeGetElement('currSubMetersContainer');
+        elements.ratePerKwh = safeGetElement('ratePerKwh');
+        elements.standingCharge = safeGetElement('standingCharge');
+        elements.standingChargeSplit = safeGetElement('standingChargeSplit');
+        elements.customSplitContainer = safeGetElement('customSplitContainer');
+        elements.customSplitPercentage = safeGetElement('customSplitPercentage');
+        elements.setTodayBtn = safeGetElement('setTodayBtn');
+        elements.addSubMeterBtn = safeGetElement('addSubMeterBtn');
+        elements.calculateBtn = safeGetElement('calculateBtn');
+        elements.generatePdfBtn = safeGetElement('generatePdfBtn');
+        elements.saveReadingBtn = safeGetElement('saveReadingBtn');
+        elements.resultsCard = safeGetElement('resultsCard');
+        
+        // For elements that have complex selectors, use a try/catch approach
+        try {
+            if (safeGetElement('resultsTable')) {
+                elements.resultsTable = safeGetElement('resultsTable').querySelector('tbody');
+            }
+        } catch (e) {
+            console.warn('Error getting resultsTable tbody:', e);
+        }
+        
+        elements.periodDays = safeGetElement('periodDays');
+        elements.totalUsage = safeGetElement('totalUsage');
         
         // History tab
-        elements.historyTab = document.getElementById('historyTab');
-        elements.historyTable = document.getElementById('historyTable').querySelector('tbody');
-        elements.historyFilter = document.getElementById('historyFilter');
-        elements.historyEmptyState = document.getElementById('historyEmptyState');
-        elements.exportDataBtn = document.getElementById('exportDataBtn');
-        elements.importDataBtn = document.getElementById('importDataBtn');
-        elements.importFileInput = document.getElementById('importFileInput');
+        elements.historyTab = safeGetElement('historyTab');
+        
+        try {
+            if (safeGetElement('historyTable')) {
+                elements.historyTable = safeGetElement('historyTable').querySelector('tbody');
+            }
+        } catch (e) {
+            console.warn('Error getting historyTable tbody:', e);
+        }
+        
+        elements.historyFilter = safeGetElement('historyFilter');
+        elements.historyEmptyState = safeGetElement('historyEmptyState');
+        elements.exportDataBtn = safeGetElement('exportDataBtn');
+        elements.importDataBtn = safeGetElement('importDataBtn');
+        elements.importFileInput = safeGetElement('importFileInput');
         
         // Settings tab
-        elements.settingsTab = document.getElementById('settingsTab');
-        elements.defaultRatePerKwh = document.getElementById('defaultRatePerKwh');
-        elements.defaultStandingCharge = document.getElementById('defaultStandingCharge');
-        elements.darkModeToggle = document.getElementById('darkModeToggle');
-        elements.roundedValuesToggle = document.getElementById('roundedValuesToggle');
-        elements.propertyName = document.getElementById('propertyName');
-        elements.propertyAddress = document.getElementById('propertyAddress');
-        elements.clearAllDataBtn = document.getElementById('clearAllDataBtn');
-        elements.storageUsage = document.getElementById('storageUsage');
+        elements.settingsTab = safeGetElement('settingsTab');
+        elements.defaultRatePerKwh = safeGetElement('defaultRatePerKwh');
+        elements.defaultStandingCharge = safeGetElement('defaultStandingCharge');
+        elements.darkModeToggle = safeGetElement('darkModeToggle');
+        elements.roundedValuesToggle = safeGetElement('roundedValuesToggle');
+        elements.propertyName = safeGetElement('propertyName');
+        elements.propertyAddress = safeGetElement('propertyAddress');
+        elements.clearAllDataBtn = safeGetElement('clearAllDataBtn');
+        elements.storageUsage = safeGetElement('storageUsage');
         
         // Alert and modal
-        elements.alertBox = document.getElementById('alertBox');
-        elements.modalOverlay = document.getElementById('modalOverlay');
-        elements.modalContent = document.getElementById('modalContent');
-        elements.modalTitle = document.getElementById('modalTitle');
-        elements.modalBody = document.getElementById('modalBody');
-        elements.modalCloseBtn = document.getElementById('modalCloseBtn');
-        elements.modalCancelBtn = document.getElementById('modalCancelBtn');
-        elements.modalConfirmBtn = document.getElementById('modalConfirmBtn');
+        elements.alertBox = safeGetElement('alertBox');
+        elements.modalOverlay = safeGetElement('modalOverlay');
+        elements.modalContent = safeGetElement('modalContent');
+        elements.modalTitle = safeGetElement('modalTitle');
+        elements.modalBody = safeGetElement('modalBody');
+        elements.modalCloseBtn = safeGetElement('modalCloseBtn');
+        elements.modalCancelBtn = safeGetElement('modalCancelBtn');
+        elements.modalConfirmBtn = safeGetElement('modalConfirmBtn');
         
         // Other
-        elements.privacyLink = document.getElementById('privacyLink');
+        elements.privacyLink = safeGetElement('privacyLink');
+        
+        console.log('DOM elements cached');
     }
     
     /**
      * Initialize tab navigation
      */
     function initTabs() {
+        console.log('Initializing tabs...');
+        
+        if (!elements.tabButtons || elements.tabButtons.length === 0) {
+            console.warn('Tab buttons not found');
+            return;
+        }
+        
         elements.tabButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                const tabId = button.id.replace('tab', '') + 'Tab';
-                switchTab(tabId);
-            });
+            if (button) {
+                button.addEventListener('click', () => {
+                    const tabId = button.id.replace('tab', '') + 'Tab';
+                    switchTab(tabId);
+                });
+            }
         });
+        
+        console.log('Tabs initialized');
     }
     
     /**
@@ -129,21 +199,32 @@ const UI = (function() {
      * @param {string} tabId The ID of the tab to switch to
      */
     function switchTab(tabId) {
+        console.log(`Switching to tab: ${tabId}`);
+        
+        if (!elements.tabButtons || !elements.tabContents) {
+            console.warn('Tab elements not available');
+            return;
+        }
+        
         // Update active class on tab buttons
         elements.tabButtons.forEach(button => {
-            if (button.id === tabId.replace('Tab', '')) {
-                button.classList.add('active');
-            } else {
-                button.classList.remove('active');
+            if (button) {
+                if (button.id === tabId.replace('Tab', '')) {
+                    button.classList.add('active');
+                } else {
+                    button.classList.remove('active');
+                }
             }
         });
         
         // Update active class on tab contents
         elements.tabContents.forEach(content => {
-            if (content.id === tabId) {
-                content.classList.add('active');
-            } else {
-                content.classList.remove('active');
+            if (content) {
+                if (content.id === tabId) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
             }
         });
         
@@ -166,87 +247,104 @@ const UI = (function() {
      * Attach all event listeners
      */
     function attachEventListeners() {
+        console.log('Attaching event listeners...');
+        
+        // Helper function to safely add event listeners
+        const safeAddEventListener = (element, event, handler) => {
+            if (element) {
+                element.addEventListener(event, handler);
+            } else {
+                console.warn(`Cannot attach ${event} event: Element is null`);
+            }
+        };
+        
         // Calculator tab
-        elements.setTodayBtn.addEventListener('click', setTodayDate);
-        elements.addSubMeterBtn.addEventListener('click', addSubMeterFields);
-        elements.calculateBtn.addEventListener('click', () => {
+        safeAddEventListener(elements.setTodayBtn, 'click', setTodayDate);
+        safeAddEventListener(elements.addSubMeterBtn, 'click', addSubMeterFields);
+        safeAddEventListener(elements.calculateBtn, 'click', () => {
             if (eventHandlers.onCalculateClicked) {
                 eventHandlers.onCalculateClicked(getFormData());
             }
         });
-        elements.generatePdfBtn.addEventListener('click', () => {
+        safeAddEventListener(elements.generatePdfBtn, 'click', () => {
             if (eventHandlers.onGeneratePdfClicked) {
                 eventHandlers.onGeneratePdfClicked();
             }
         });
-        elements.saveReadingBtn.addEventListener('click', () => {
+        safeAddEventListener(elements.saveReadingBtn, 'click', () => {
             if (eventHandlers.onSaveReadingClicked) {
                 eventHandlers.onSaveReadingClicked();
             }
         });
-        elements.standingChargeSplit.addEventListener('change', () => {
+        safeAddEventListener(elements.standingChargeSplit, 'change', () => {
             toggleCustomSplitVisibility();
         });
         
         // History tab
-        elements.historyFilter.addEventListener('change', () => {
+        safeAddEventListener(elements.historyFilter, 'change', () => {
             if (eventHandlers.onHistoryFilterChanged) {
                 eventHandlers.onHistoryFilterChanged(elements.historyFilter.value);
             }
         });
-        elements.exportDataBtn.addEventListener('click', () => {
+        safeAddEventListener(elements.exportDataBtn, 'click', () => {
             if (eventHandlers.onExportDataClicked) {
                 eventHandlers.onExportDataClicked();
             }
         });
-        elements.importDataBtn.addEventListener('click', () => {
-            elements.importFileInput.click();
+        safeAddEventListener(elements.importDataBtn, 'click', () => {
+            if (elements.importFileInput) {
+                elements.importFileInput.click();
+            }
         });
-        elements.importFileInput.addEventListener('change', (e) => {
+        safeAddEventListener(elements.importFileInput, 'change', (e) => {
             if (e.target.files.length > 0 && eventHandlers.onImportFileSelected) {
                 eventHandlers.onImportFileSelected(e.target.files[0]);
             }
         });
         
         // Settings tab
-        elements.darkModeToggle.addEventListener('change', () => {
-            state.darkMode = elements.darkModeToggle.checked;
-            if (state.darkMode) {
-                enableDarkMode();
-            } else {
-                disableDarkMode();
-            }
-            if (eventHandlers.onDarkModeToggled) {
-                eventHandlers.onDarkModeToggled(state.darkMode);
-            }
-        });
-        elements.roundedValuesToggle.addEventListener('change', () => {
-            state.roundedValues = elements.roundedValuesToggle.checked;
-            if (eventHandlers.onRoundedValuesToggled) {
-                eventHandlers.onRoundedValuesToggled(state.roundedValues);
+        safeAddEventListener(elements.darkModeToggle, 'change', () => {
+            if (elements.darkModeToggle) {
+                state.darkMode = elements.darkModeToggle.checked;
+                if (state.darkMode) {
+                    enableDarkMode();
+                } else {
+                    disableDarkMode();
+                }
+                if (eventHandlers.onDarkModeToggled) {
+                    eventHandlers.onDarkModeToggled(state.darkMode);
+                }
             }
         });
-        elements.defaultRatePerKwh.addEventListener('change', () => {
-            if (eventHandlers.onDefaultRateChanged) {
+        safeAddEventListener(elements.roundedValuesToggle, 'change', () => {
+            if (elements.roundedValuesToggle) {
+                state.roundedValues = elements.roundedValuesToggle.checked;
+                if (eventHandlers.onRoundedValuesToggled) {
+                    eventHandlers.onRoundedValuesToggled(state.roundedValues);
+                }
+            }
+        });
+        safeAddEventListener(elements.defaultRatePerKwh, 'change', () => {
+            if (eventHandlers.onDefaultRateChanged && elements.defaultRatePerKwh) {
                 eventHandlers.onDefaultRateChanged(parseFloat(elements.defaultRatePerKwh.value));
             }
         });
-        elements.defaultStandingCharge.addEventListener('change', () => {
-            if (eventHandlers.onDefaultStandingChargeChanged) {
+        safeAddEventListener(elements.defaultStandingCharge, 'change', () => {
+            if (eventHandlers.onDefaultStandingChargeChanged && elements.defaultStandingCharge) {
                 eventHandlers.onDefaultStandingChargeChanged(parseFloat(elements.defaultStandingCharge.value));
             }
         });
-        elements.propertyName.addEventListener('change', () => {
-            if (eventHandlers.onPropertyNameChanged) {
+        safeAddEventListener(elements.propertyName, 'change', () => {
+            if (eventHandlers.onPropertyNameChanged && elements.propertyName) {
                 eventHandlers.onPropertyNameChanged(elements.propertyName.value);
             }
         });
-        elements.propertyAddress.addEventListener('change', () => {
-            if (eventHandlers.onPropertyAddressChanged) {
+        safeAddEventListener(elements.propertyAddress, 'change', () => {
+            if (eventHandlers.onPropertyAddressChanged && elements.propertyAddress) {
                 eventHandlers.onPropertyAddressChanged(elements.propertyAddress.value);
             }
         });
-        elements.clearAllDataBtn.addEventListener('click', () => {
+        safeAddEventListener(elements.clearAllDataBtn, 'click', () => {
             showConfirmationModal(
                 'Clear All Data', 
                 'Are you sure you want to clear all data? This action cannot be undone.',
@@ -259,14 +357,16 @@ const UI = (function() {
         });
         
         // Modal
-        elements.modalCloseBtn.addEventListener('click', closeModal);
-        elements.modalCancelBtn.addEventListener('click', closeModal);
+        safeAddEventListener(elements.modalCloseBtn, 'click', closeModal);
+        safeAddEventListener(elements.modalCancelBtn, 'click', closeModal);
         
         // Privacy link
-        elements.privacyLink.addEventListener('click', (e) => {
+        safeAddEventListener(elements.privacyLink, 'click', (e) => {
             e.preventDefault();
             showPrivacyPolicy();
         });
+        
+        console.log('Event listeners attached');
     }
     
     /**
@@ -641,6 +741,14 @@ const UI = (function() {
      * @param {Object} settings Settings object
      */
     function updateSettingsUI(settings) {
+        // Make sure elements exist before trying to access them
+        if (!elements || !elements.defaultRatePerKwh || !elements.defaultStandingCharge || 
+            !elements.darkModeToggle || !elements.roundedValuesToggle ||
+            !elements.propertyName || !elements.propertyAddress) {
+            console.warn('Settings UI elements not fully loaded yet');
+            return; // Exit early if elements aren't ready
+        }
+
         if (settings.defaultRatePerKwh !== undefined) {
             elements.defaultRatePerKwh.value = settings.defaultRatePerKwh;
         }
@@ -699,8 +807,17 @@ const UI = (function() {
      * @param {number} duration Duration in milliseconds (0 for no auto-hide)
      */
     function showAlert(message, type = 'warning', duration = 5000) {
+        // Make sure the element exists
+        if (!elements.alertBox) {
+            console.error('Alert box element not found');
+            // Fallback to browser alert in case DOM isn't ready
+            alert(message);
+            return;
+        }
+        
         // Set alert type
-        elements.alertBox.className = 'alert alert-' + type;
+        elements.alertBox.className = 'alert';
+        elements.alertBox.classList.add('alert-' + type);
         
         // Set message
         elements.alertBox.textContent = message;
@@ -711,7 +828,9 @@ const UI = (function() {
         // Auto-hide after duration if not 0
         if (duration > 0) {
             setTimeout(() => {
-                elements.alertBox.classList.add('hidden');
+                if (elements.alertBox) {
+                    elements.alertBox.classList.add('hidden');
+                }
             }, duration);
         }
     }
@@ -937,3 +1056,6 @@ const UI = (function() {
         switchTab
     };
 })();
+
+// Make UI available globally
+window.UI = UI;
