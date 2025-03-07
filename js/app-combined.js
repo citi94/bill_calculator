@@ -3111,25 +3111,215 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         try {
+            // Check if jsPDF is available
+            if (typeof window.jspdf === 'undefined' || !window.jspdf.jsPDF) {
+                console.error('jsPDF library not found');
+                UI.showAlert('PDF generation library is not available. Please check your internet connection.', 'danger');
+                return;
+            }
+            
+            console.log('Generating PDF from calculation:', currentCalculation);
+            
             // Generate detailed PDF
-            const pdf = PDFGenerator.generateBillPDF(currentCalculation, {
-                propertyName: appSettings.propertyName,
-                propertyAddress: appSettings.propertyAddress
-            });
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // PDF configuration
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const margin = 20;
+            let yPos = margin;
+            
+            // Add header
+            doc.setFontSize(22);
+            doc.setTextColor(74, 109, 167);
+            doc.text("Electricity Bill Calculation", pageWidth / 2, yPos, { align: "center" });
+            yPos += 10;
+            
+            // Add property details if provided
+            if (appSettings.propertyName) {
+                doc.setFontSize(12);
+                doc.setTextColor(100, 100, 100);
+                doc.text(appSettings.propertyName, pageWidth / 2, yPos, { align: "center" });
+                yPos += 10;
+            }
+            
+            // Add reading period
+            doc.setFontSize(14);
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Reading Period: ${currentCalculation.readings.prev.date} to ${currentCalculation.readings.curr.date}`, margin, yPos);
+            yPos += 6;
+            doc.setFontSize(12);
+            doc.text(`${currentCalculation.periodDays} days`, margin, yPos);
+            yPos += 10;
+            
+            // Add meter readings
+            doc.setFontSize(16);
+            doc.setTextColor(74, 109, 167);
+            doc.text("Meter Readings", margin, yPos);
+            yPos += 10;
+            
+            // Table headers
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            doc.setFont(undefined, 'bold');
+            doc.text("Meter", margin + 5, yPos);
+            doc.text("Previous Reading", margin + 70, yPos);
+            doc.text("Current Reading", margin + 130, yPos);
+            doc.text("Usage (kWh)", pageWidth - margin - 30, yPos);
+            yPos += 8;
+            
+            // Reset font
+            doc.setFont(undefined, 'normal');
+            
+            // Main meter
+            doc.text("Main Meter", margin + 5, yPos);
+            doc.text(currentCalculation.readings.prev.main.toString(), margin + 70, yPos);
+            doc.text(currentCalculation.readings.curr.main.toString(), margin + 130, yPos);
+            doc.text(currentCalculation.usages.main.toFixed(1), pageWidth - margin - 30, yPos);
+            yPos += 6;
+            
+            // Sub meters
+            for (let i = 0; i < currentCalculation.readings.prev.sub.length; i++) {
+                const label = currentCalculation.meterLabels.subMeters[i] || `Sub Meter ${i+1}`;
+                doc.text(label, margin + 5, yPos);
+                doc.text(currentCalculation.readings.prev.sub[i].toString(), margin + 70, yPos);
+                doc.text(currentCalculation.readings.curr.sub[i].toString(), margin + 130, yPos);
+                doc.text(currentCalculation.usages.subMeters[i].toFixed(1), pageWidth - margin - 30, yPos);
+                yPos += 6;
+            }
+            
+            // Costs
+            yPos += 8;
+            doc.setFontSize(16);
+            doc.setTextColor(74, 109, 167);
+            doc.text("Costs", margin, yPos);
+            yPos += 10;
+            
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            doc.text(`Rate per kWh: ${currentCalculation.rates.ratePerKwh} pence`, margin + 5, yPos);
+            yPos += 6;
+            doc.text(`Standing Charge: ${currentCalculation.rates.standingCharge} pence per day`, margin + 5, yPos);
+            yPos += 10;
+            
+            // Table headers
+            doc.setFont(undefined, 'bold');
+            doc.text("Meter", margin + 5, yPos);
+            doc.text("Energy Cost (£)", margin + 80, yPos);
+            doc.text("Standing Charge (£)", margin + 140, yPos);
+            doc.text("Total (£)", pageWidth - margin - 30, yPos);
+            yPos += 8;
+            
+            // Reset font
+            doc.setFont(undefined, 'normal');
+            
+            // Property
+            doc.text("Main Property", margin + 5, yPos);
+            doc.text(currentCalculation.costs.property.energyCost.toFixed(2), margin + 80, yPos);
+            doc.text(currentCalculation.costs.property.standingCharge.toFixed(2), margin + 140, yPos);
+            doc.text(currentCalculation.costs.property.total.toFixed(2), pageWidth - margin - 30, yPos);
+            yPos += 6;
+            
+            // Sub meters
+            for (const subMeter of currentCalculation.costs.subMeters) {
+                doc.text(subMeter.label, margin + 5, yPos);
+                doc.text(subMeter.energyCost.toFixed(2), margin + 80, yPos);
+                doc.text(subMeter.standingCharge.toFixed(2), margin + 140, yPos);
+                doc.text(subMeter.total.toFixed(2), pageWidth - margin - 30, yPos);
+                yPos += 6;
+            }
+            
+            // Total
+            yPos += 4;
+            doc.setFont(undefined, 'bold');
+            doc.text("Total", margin + 5, yPos);
+            doc.text(currentCalculation.costs.total.toFixed(2), pageWidth - margin - 30, yPos);
+            
+            // Footer
+            yPos = pageHeight - margin;
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Generated on ${new Date().toLocaleDateString()}`, margin, yPos);
             
             // Generate filename based on date
             const dateStr = currentCalculation.readings.curr.date.replace(/-/g, '');
             const filename = `ElectricityBill_${dateStr}.pdf`;
             
             // Save PDF
-            pdf.save(filename);
+            doc.save(filename);
             
             UI.showAlert('PDF generated successfully.', 'success');
         } catch (error) {
             console.error('PDF generation error:', error);
-            UI.showAlert('Error generating PDF.', 'danger');
+            UI.showAlert('Error generating PDF: ' + error.message, 'danger');
         }
     }
+
+    // Function to fix the PDF button handler
+function fixPdfButtonHandler() {
+    // Find the button
+    const generatePdfBtn = document.getElementById('generatePdfBtn');
+    if (!generatePdfBtn) {
+        console.error('Generate PDF button not found');
+        return;
+    }
+    
+    // Add a direct click handler
+    generatePdfBtn.addEventListener('click', function() {
+        console.log('Generate PDF button clicked');
+        generatePdf();
+    });
+    
+    console.log('Added direct click handler to Generate PDF button');
+}
+
+// Function to ensure jsPDF library is properly loaded
+function checkAndLoadJsPDF() {
+    // Check if jsPDF is already available
+    if (typeof window.jspdf !== 'undefined' && window.jspdf.jsPDF) {
+        console.log('jsPDF library already loaded');
+        return Promise.resolve();
+    }
+    
+    console.log('Attempting to load jsPDF library');
+    
+    // Create a script element to load jsPDF
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        script.integrity = 'sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKLRRhRvkVXXsEngpRzurLJm9U8emWRNSF8649g==';
+        script.crossOrigin = 'anonymous';
+        script.referrerpolicy = 'no-referrer';
+        script.onload = () => {
+            console.log('jsPDF library loaded successfully');
+            resolve();
+        };
+        script.onerror = () => {
+            console.error('Failed to load jsPDF library');
+            reject(new Error('Failed to load jsPDF library'));
+        };
+        document.head.appendChild(script);
+    });
+}
+
+// Function to initialize all PDF-related fixes
+async function initPdfFixes() {
+    try {
+        // Try to load jsPDF if it's not already loaded
+        await checkAndLoadJsPDF();
+        
+        // Fix the PDF button handler
+        fixPdfButtonHandler();
+        
+        console.log('PDF functionality fixes applied');
+        return true;
+    } catch (error) {
+        console.error('Failed to initialize PDF fixes:', error);
+        return false;
+    }
+}
     
     /**
      * Save current reading and calculation to storage
