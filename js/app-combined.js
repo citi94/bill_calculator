@@ -151,18 +151,18 @@ const BillValidator = (function() {
     
     /**
      * Validates sub-meter readings against main meter
-     * @param {number} mainReading Main meter reading
-     * @param {Array<number>} subReadings Array of sub-meter readings
+     * @param {number} mainConsumption Main meter consumption (difference between readings)
+     * @param {Array<number>} subConsumptions Array of sub-meter consumptions (differences)
      * @returns {Object} Validation result
      */
-    function validateSubMeters(mainReading, subReadings) {
+    function validateSubMeters(mainConsumption, subConsumptions) {
         const result = { isValid: false, message: '' };
         
-        // Calculate total of sub-meter readings
-        const subTotal = subReadings.reduce((sum, reading) => sum + reading, 0);
+        // Calculate total of sub-meter consumptions
+        const subTotal = subConsumptions.reduce((sum, consumption) => sum + consumption, 0);
         
-        if (subTotal > mainReading) {
-            result.message = 'Sub-meter total cannot exceed main meter reading';
+        if (subTotal > mainConsumption) {
+            result.message = `Sub-meter usage (${subTotal.toFixed(2)} kWh) cannot exceed main meter usage (${mainConsumption.toFixed(2)} kWh)`;
             return result;
         }
         
@@ -325,26 +325,16 @@ const BillValidator = (function() {
         if (prevMainResult.isValid && currMainResult.isValid && 
             subResults.prev.every(r => r.isValid) && subResults.curr.every(r => r.isValid)) {
             
-            // Check previous readings
-            const prevSubValidation = validateSubMeters(
-                prevMainResult.value, 
-                subResults.prev.map(r => r.value)
-            );
+            // Calculate consumptions instead of comparing raw readings
+            const mainConsumption = currMainResult.value - prevMainResult.value;
+            const subConsumptions = subResults.curr.map((curr, i) => curr.value - subResults.prev[i].value);
             
-            if (!prevSubValidation.isValid) {
+            // Use the updated validateSubMeters function to check consumption
+            const subMetersValidation = validateSubMeters(mainConsumption, subConsumptions);
+            
+            if (!subMetersValidation.isValid) {
                 result.isValid = false;
-                result.errors.push(`Previous readings: ${prevSubValidation.message}`);
-            }
-            
-            // Check current readings
-            const currSubValidation = validateSubMeters(
-                currMainResult.value, 
-                subResults.curr.map(r => r.value)
-            );
-            
-            if (!currSubValidation.isValid) {
-                result.isValid = false;
-                result.errors.push(`Current readings: ${currSubValidation.message}`);
+                result.errors.push(subMetersValidation.message);
             }
         }
         
