@@ -287,6 +287,112 @@
     <!-- JavaScript -->
     <script src="js/app-combined.js"></script>
     
+    <!-- Date Format Conversion Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Function to convert between date formats
+            function setupDateConversion(dateInput) {
+                if (!dateInput) return;
+                
+                // Store the original value for later use
+                let isoValue = dateInput.value;
+                
+                // Create a hidden input with the same ID to store the formatted date
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = 'hidden';
+                hiddenInput.name = dateInput.name || dateInput.id;
+                hiddenInput.id = dateInput.id + '_formatted';
+                dateInput.parentNode.insertBefore(hiddenInput, dateInput.nextSibling);
+                
+                // Rename the visible date input to avoid ID conflicts
+                const originalId = dateInput.id;
+                dateInput.id = originalId + '_picker';
+                
+                // Create a visible text input that shows the date in DD-MM-YYYY format
+                const visibleInput = document.createElement('input');
+                visibleInput.type = 'text';
+                visibleInput.id = originalId;
+                visibleInput.className = dateInput.className;
+                visibleInput.placeholder = 'DD-MM-YYYY';
+                visibleInput.readOnly = true; // Make it read-only to force using the date picker
+                dateInput.parentNode.insertBefore(visibleInput, dateInput);
+                
+                // Hide the original date input
+                dateInput.style.display = 'none';
+                
+                // Convert ISO date to DD-MM-YYYY
+                function isoToCustomFormat(isoDate) {
+                    if (!isoDate) return '';
+                    const [year, month, day] = isoDate.split('-');
+                    return `${day}-${month}-${year}`;
+                }
+                
+                // Update visible input when date picker changes
+                dateInput.addEventListener('change', function() {
+                    const isoDate = this.value;
+                    const formattedDate = isoToCustomFormat(isoDate);
+                    visibleInput.value = formattedDate;
+                    hiddenInput.value = formattedDate;
+                });
+                
+                // Initial conversion if there's a value
+                if (isoValue) {
+                    visibleInput.value = isoToCustomFormat(isoValue);
+                    hiddenInput.value = isoToCustomFormat(isoValue);
+                }
+                
+                // When calendar button is clicked, click the hidden date input
+                return visibleInput;
+            }
+            
+            // Setup date conversion for both date inputs
+            const prevDateInput = document.getElementById('prevDate');
+            const currDateInput = document.getElementById('currDate');
+            
+            const prevVisibleInput = setupDateConversion(prevDateInput);
+            const currVisibleInput = setupDateConversion(currDateInput);
+            
+            // Update calendar button event listeners
+            const setPrevDateBtn = document.getElementById('setPrevDateBtn');
+            if (setPrevDateBtn && prevDateInput) {
+                setPrevDateBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    prevDateInput.click();
+                }, true);
+                
+                // Set today's date when calendar button is clicked
+                setPrevDateBtn.addEventListener('click', function() {
+                    const today = new Date();
+                    const formattedDate = today.toISOString().split('T')[0];
+                    prevDateInput.value = formattedDate;
+                    
+                    // Trigger change event to update the visible input
+                    const event = new Event('change');
+                    prevDateInput.dispatchEvent(event);
+                });
+            }
+            
+            const setTodayBtn = document.getElementById('setTodayBtn');
+            if (setTodayBtn && currDateInput) {
+                setTodayBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    currDateInput.click();
+                }, true);
+                
+                // Set today's date when calendar button is clicked
+                setTodayBtn.addEventListener('click', function() {
+                    const today = new Date();
+                    const formattedDate = today.toISOString().split('T')[0];
+                    currDateInput.value = formattedDate;
+                    
+                    // Trigger change event to update the visible input
+                    const event = new Event('change');
+                    currDateInput.dispatchEvent(event);
+                });
+            }
+        });
+    </script>
+    
     <!-- Global Function Fix -->
     <script>
         // Make functions globally available
@@ -296,13 +402,31 @@
             // Format date as YYYY-MM-DD for the date input
             const formattedDate = today.toISOString().split('T')[0];
             
-            const prevDateInput = document.getElementById('prevDate');
-            if (prevDateInput) {
-                prevDateInput.value = formattedDate;
-                // Focus and open the calendar
-                prevDateInput.focus();
-                // Simulate a click to open the native date picker
-                prevDateInput.click();
+            // Try both the original and the _picker version
+            const prevDatePicker = document.getElementById('prevDate_picker');
+            if (prevDatePicker) {
+                prevDatePicker.value = formattedDate;
+                // Trigger change event to update the visible input
+                const event = new Event('change');
+                prevDatePicker.dispatchEvent(event);
+            } else {
+                // Fallback to the original ID
+                const prevDateInput = document.getElementById('prevDate');
+                if (prevDateInput) {
+                    prevDateInput.value = formattedDate;
+                    
+                    // If it's a date input, convert to DD-MM-YYYY for the original app logic
+                    if (prevDateInput.type === 'date') {
+                        const [year, month, day] = formattedDate.split('-');
+                        const ddmmyyyyDate = `${day}-${month}-${year}`;
+                        
+                        // Look for a hidden formatted input
+                        const formattedInput = document.getElementById('prevDate_formatted');
+                        if (formattedInput) {
+                            formattedInput.value = ddmmyyyyDate;
+                        }
+                    }
+                }
             }
         };
         
@@ -385,20 +509,45 @@
                 const setPrevDateBtn = document.getElementById('setPrevDateBtn');
                 if (setPrevDateBtn) {
                     console.log("Adding click handler to setPrevDateBtn");
-                    setPrevDateBtn.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        console.log("setPrevDateBtn clicked");
+                    setPrevDateBtn.addEventListener('click', function() {
+                        console.log("setPrevDateBtn clicked (window.onload handler)");
+                        
+                        // Get today's date in ISO format
                         const today = new Date();
                         const formattedDate = today.toISOString().split('T')[0];
                         
-                        const prevDateInput = document.getElementById('prevDate');
-                        if (prevDateInput) {
-                            prevDateInput.value = formattedDate;
-                            // Focus and open the calendar
-                            prevDateInput.focus();
-                            prevDateInput.click();
+                        // Try both the original and the _picker version
+                        const prevDatePicker = document.getElementById('prevDate_picker');
+                        if (prevDatePicker) {
+                            prevDatePicker.value = formattedDate;
+                            // Trigger change event to update the visible input
+                            const event = new Event('change');
+                            prevDatePicker.dispatchEvent(event);
+                        } else {
+                            // Fallback to the original ID
+                            const prevDateInput = document.getElementById('prevDate');
+                            if (prevDateInput) {
+                                prevDateInput.value = formattedDate;
+                                
+                                // If it's a date input and we need DD-MM-YYYY format
+                                if (prevDateInput.type === 'date') {
+                                    try {
+                                        // Convert to DD-MM-YYYY
+                                        const [year, month, day] = formattedDate.split('-');
+                                        const ddmmyyyyDate = `${day}-${month}-${year}`;
+                                        
+                                        // Update any hidden formatted input
+                                        const formattedInput = document.getElementById('prevDate_formatted');
+                                        if (formattedInput) {
+                                            formattedInput.value = ddmmyyyyDate;
+                                        }
+                                    } catch (e) {
+                                        console.error('Error converting date format:', e);
+                                    }
+                                }
+                            }
                         }
-                    }, true);
+                    });
                 }
                 
                 // Load Last Reading button
@@ -417,17 +566,47 @@
                             BillStorageManager.getMostRecentReading().then(function(mostRecentReading) {
                                 if (mostRecentReading) {
                                     const date = new Date(mostRecentReading.currentDate);
+                                    
+                                    // Set date in both formats
+                                    const isoDate = date.toISOString().split('T')[0];
                                     const day = String(date.getDate()).padStart(2, '0');
                                     const month = String(date.getMonth() + 1).padStart(2, '0');
                                     const year = date.getFullYear();
+                                    const ddmmyyyyDate = `${day}-${month}-${year}`;
                                     
-                                    const prevDateEl = document.getElementById('prevDate');
+                                    // Try to set the date in the appropriate inputs
+                                    const prevDatePicker = document.getElementById('prevDate_picker');
+                                    const prevDateInput = document.getElementById('prevDate');
+                                    const prevDateFormatted = document.getElementById('prevDate_formatted');
+                                    
+                                    if (prevDatePicker) {
+                                        // Set ISO date in the hidden date picker
+                                        prevDatePicker.value = isoDate;
+                                        // Trigger change event to update the visible input
+                                        const event = new Event('change');
+                                        prevDatePicker.dispatchEvent(event);
+                                    } else if (prevDateInput) {
+                                        // Set appropriate format based on input type
+                                        if (prevDateInput.type === 'date') {
+                                            prevDateInput.value = isoDate;
+                                        } else {
+                                            prevDateInput.value = ddmmyyyyDate;
+                                        }
+                                    }
+                                    
+                                    // Also update any hidden formatted input
+                                    if (prevDateFormatted) {
+                                        prevDateFormatted.value = ddmmyyyyDate;
+                                    }
+                                    
+                                    // Set meter readings
                                     const prevMainMeterEl = document.getElementById('prevMainMeter');
+                                    if (prevMainMeterEl) {
+                                        prevMainMeterEl.value = mostRecentReading.currentMainReading;
+                                    }
+                                    
+                                    // Handle sub-meter readings
                                     const prevSubMetersContainer = document.getElementById('prevSubMetersContainer');
-                                    
-                                    if (prevDateEl) prevDateEl.value = `${day}-${month}-${year}`;
-                                    if (prevMainMeterEl) prevMainMeterEl.value = mostRecentReading.currentMainReading;
-                                    
                                     if (prevSubMetersContainer && mostRecentReading.currentSubReadings) {
                                         prevSubMetersContainer.innerHTML = '';
                                         mostRecentReading.currentSubReadings.forEach((reading, index) => {
@@ -499,15 +678,41 @@
             // Previous date button
             document.getElementById('setPrevDateBtn')?.addEventListener('click', function() {
                 console.log("setPrevDateBtn clicked (window.onload handler)");
+                
+                // Get today's date in ISO format
                 const today = new Date();
                 const formattedDate = today.toISOString().split('T')[0];
                 
-                const prevDateInput = document.getElementById('prevDate');
-                if (prevDateInput) {
-                    prevDateInput.value = formattedDate;
-                    // Focus and open the calendar
-                    prevDateInput.focus();
-                    prevDateInput.click();
+                // Try both the original and the _picker version
+                const prevDatePicker = document.getElementById('prevDate_picker');
+                if (prevDatePicker) {
+                    prevDatePicker.value = formattedDate;
+                    // Trigger change event to update the visible input
+                    const event = new Event('change');
+                    prevDatePicker.dispatchEvent(event);
+                } else {
+                    // Fallback to the original ID
+                    const prevDateInput = document.getElementById('prevDate');
+                    if (prevDateInput) {
+                        prevDateInput.value = formattedDate;
+                        
+                        // If it's a date input and we need DD-MM-YYYY format
+                        if (prevDateInput.type === 'date') {
+                            try {
+                                // Convert to DD-MM-YYYY
+                                const [year, month, day] = formattedDate.split('-');
+                                const ddmmyyyyDate = `${day}-${month}-${year}`;
+                                
+                                // Update any hidden formatted input
+                                const formattedInput = document.getElementById('prevDate_formatted');
+                                if (formattedInput) {
+                                    formattedInput.value = ddmmyyyyDate;
+                                }
+                            } catch (e) {
+                                console.error('Error converting date format:', e);
+                            }
+                        }
+                    }
                 }
             });
             
