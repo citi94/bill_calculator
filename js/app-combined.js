@@ -1988,6 +1988,20 @@ const UI = (function() {
     }
     
     /**
+     * Set previous date field to today's date
+     */
+    function setPreviousDate() {
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, '0');
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const year = today.getFullYear();
+        
+        if (elements.prevDate) {
+            elements.prevDate.value = `${day}-${month}-${year}`;
+        }
+    }
+    
+    /**
      * Toggle visibility of custom split percentage field
      */
     function toggleCustomSplitVisibility() {
@@ -2824,6 +2838,52 @@ const UI = (function() {
         return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
     }
     
+    /**
+     * Updates the count of sub-meters based on visible fields
+     */
+    function updateSubMeterCount() {
+        // Count the current meter fields
+        const currSubMeters = document.querySelectorAll('input[id^="currSubMeter_"]');
+        
+        // Also check prev sub meters (they might have been added through loading)
+        const prevSubMeters = document.querySelectorAll('input[id^="prevSubMeter_"]');
+        
+        // Take the maximum of the two counts to ensure we have the accurate count
+        state.subMeterCount = Math.max(currSubMeters.length, prevSubMeters.length);
+        
+        // Ensure both sections have the same number of sub-meter fields
+        syncSubMeterFields();
+    }
+    
+    /**
+     * Ensures both previous and current sections have the same number of sub-meter fields
+     */
+    function syncSubMeterFields() {
+        const currSubMeters = document.querySelectorAll('input[id^="currSubMeter_"]');
+        const prevSubMeters = document.querySelectorAll('input[id^="prevSubMeter_"]');
+        
+        // If prev has more, add to current
+        if (prevSubMeters.length > currSubMeters.length) {
+            for (let i = currSubMeters.length; i < prevSubMeters.length; i++) {
+                addSubMeterFields();
+            }
+        }
+        
+        // If current has more, add to prev
+        if (currSubMeters.length > prevSubMeters.length) {
+            for (let i = prevSubMeters.length; i < currSubMeters.length; i++) {
+                // Add sub meter to prev section
+                const subMeterField = document.createElement('div');
+                subMeterField.className = 'form-group';
+                subMeterField.innerHTML = `
+                    <label for="prevSubMeter_${i}">Sub Meter (kWh):</label>
+                    <input type="number" id="prevSubMeter_${i}" step="0.01" min="0">
+                `;
+                elements.prevSubMetersContainer.appendChild(subMeterField);
+            }
+        }
+    }
+    
     // Return public methods
     return {
         init,
@@ -2836,6 +2896,8 @@ const UI = (function() {
         showAlert,
         showConfirmationModal,
         showReadingDetailsModal,
+        showCustomModal,
+        closeModal,
         switchTab,
         showFirstTimeSetup,
         addInitialSubMeterField,
@@ -3984,7 +4046,7 @@ function handleNewReadingCycle() {
      */
     async function loadLastReadingAsPrevious() {
         try {
-            const mostRecentReading = await dataLayer.getMostRecentReading();
+            const mostRecentReading = await BillStorageManager.getMostRecentReading();
             
             if (mostRecentReading) {
                 // Set date to the current reading date from the most recent record
@@ -3992,35 +4054,46 @@ function handleNewReadingCycle() {
                 const day = String(date.getDate()).padStart(2, '0');
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const year = date.getFullYear();
-                elements.prevDate.value = `${day}-${month}-${year}`;
                 
-                // Set main meter reading
-                elements.prevMainMeter.value = mostRecentReading.currentMainReading;
+                // Use UI elements
+                const prevDateElement = document.getElementById('prevDate');
+                const prevMainMeterElement = document.getElementById('prevMainMeter');
+                const prevSubMetersContainer = document.getElementById('prevSubMetersContainer');
                 
-                // Clear existing sub meter fields
-                elements.prevSubMetersContainer.innerHTML = '';
+                if (prevDateElement) {
+                    prevDateElement.value = `${day}-${month}-${year}`;
+                }
                 
-                // Add sub meter fields with current values from the most recent reading
-                mostRecentReading.currentSubReadings.forEach((reading, index) => {
-                    const subMeterField = document.createElement('div');
-                    subMeterField.className = 'form-group';
-                    subMeterField.innerHTML = `
-                        <label for="prevSubMeter_${index}">Sub Meter (kWh):</label>
-                        <input type="number" id="prevSubMeter_${index}" step="0.01" min="0" value="${reading}">
-                    `;
-                    elements.prevSubMetersContainer.appendChild(subMeterField);
-                });
+                if (prevMainMeterElement) {
+                    prevMainMeterElement.value = mostRecentReading.currentMainReading;
+                }
                 
-                showAlert('Last reading loaded as previous reading', 'success');
+                if (prevSubMetersContainer) {
+                    // Clear existing sub meter fields
+                    prevSubMetersContainer.innerHTML = '';
+                    
+                    // Add sub meter fields with current values from the most recent reading
+                    mostRecentReading.currentSubReadings.forEach((reading, index) => {
+                        const subMeterField = document.createElement('div');
+                        subMeterField.className = 'form-group';
+                        subMeterField.innerHTML = `
+                            <label for="prevSubMeter_${index}">Sub Meter (kWh):</label>
+                            <input type="number" id="prevSubMeter_${index}" step="0.01" min="0" value="${reading}">
+                        `;
+                        prevSubMetersContainer.appendChild(subMeterField);
+                    });
+                }
                 
-                // Update the subMeterCount to keep everything in sync
-                UI.updateSubMeterCount();
+                UI.showAlert('Last reading loaded as previous reading', 'success');
+                
+                // Sync the number of sub-meter fields for current and previous readings
+                syncSubMeterFieldsManually();
             } else {
-                showAlert('No previous readings found', 'warning');
+                UI.showAlert('No previous readings found', 'warning');
             }
         } catch (error) {
             console.error('Error loading last reading:', error);
-            showAlert('Failed to load last reading', 'error');
+            UI.showAlert('Failed to load last reading', 'error');
         }
     }
 
@@ -4029,10 +4102,10 @@ function handleNewReadingCycle() {
      */
     async function showLoadFromHistoryModal() {
         try {
-            const readings = await dataLayer.getAllReadings();
+            const readings = await BillStorageManager.getAllReadings();
             
             if (!readings || readings.length === 0) {
-                showAlert('No reading history available', 'warning');
+                UI.showAlert('No reading history available', 'warning');
                 return;
             }
             
@@ -4074,20 +4147,20 @@ function handleNewReadingCycle() {
                 </div>
             `;
             
-            showCustomModal('Select Previous Reading', tableHTML, null, true);
+            UI.showCustomModal('Select Previous Reading', tableHTML, null, true);
             
             // Add event listeners to the "Use" buttons
             document.querySelectorAll('.use-reading-btn').forEach(button => {
                 button.addEventListener('click', function() {
                     const readingId = this.getAttribute('data-reading-id');
                     useHistoryReading(readingId);
-                    closeModal();
+                    UI.closeModal();
                 });
             });
             
         } catch (error) {
             console.error('Error showing history modal:', error);
-            showAlert('Failed to load reading history', 'error');
+            UI.showAlert('Failed to load reading history', 'error');
         }
     }
 
@@ -4097,7 +4170,7 @@ function handleNewReadingCycle() {
      */
     async function useHistoryReading(readingId) {
         try {
-            const readings = await dataLayer.getAllReadings();
+            const readings = await BillStorageManager.getAllReadings();
             const selectedReading = readings.find(reading => reading.id === readingId);
             
             if (selectedReading) {
@@ -4106,33 +4179,44 @@ function handleNewReadingCycle() {
                 const day = String(date.getDate()).padStart(2, '0');
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const year = date.getFullYear();
-                elements.prevDate.value = `${day}-${month}-${year}`;
                 
-                // Set main meter reading
-                elements.prevMainMeter.value = selectedReading.currentMainReading;
+                // Use direct DOM access
+                const prevDateElement = document.getElementById('prevDate');
+                const prevMainMeterElement = document.getElementById('prevMainMeter');
+                const prevSubMetersContainer = document.getElementById('prevSubMetersContainer');
                 
-                // Clear existing sub meter fields
-                elements.prevSubMetersContainer.innerHTML = '';
+                if (prevDateElement) {
+                    prevDateElement.value = `${day}-${month}-${year}`;
+                }
                 
-                // Add sub meter fields
-                selectedReading.currentSubReadings.forEach((reading, index) => {
-                    const subMeterField = document.createElement('div');
-                    subMeterField.className = 'form-group';
-                    subMeterField.innerHTML = `
-                        <label for="prevSubMeter_${index}">Sub Meter (kWh):</label>
-                        <input type="number" id="prevSubMeter_${index}" step="0.01" min="0" value="${reading}">
-                    `;
-                    elements.prevSubMetersContainer.appendChild(subMeterField);
-                });
+                if (prevMainMeterElement) {
+                    prevMainMeterElement.value = selectedReading.currentMainReading;
+                }
                 
-                showAlert('Selected reading loaded as previous reading', 'success');
+                if (prevSubMetersContainer) {
+                    // Clear existing sub meter fields
+                    prevSubMetersContainer.innerHTML = '';
+                    
+                    // Add sub meter fields
+                    selectedReading.currentSubReadings.forEach((reading, index) => {
+                        const subMeterField = document.createElement('div');
+                        subMeterField.className = 'form-group';
+                        subMeterField.innerHTML = `
+                            <label for="prevSubMeter_${index}">Sub Meter (kWh):</label>
+                            <input type="number" id="prevSubMeter_${index}" step="0.01" min="0" value="${reading}">
+                        `;
+                        prevSubMetersContainer.appendChild(subMeterField);
+                    });
+                }
                 
-                // Update the subMeterCount to keep everything in sync
-                UI.updateSubMeterCount();
+                UI.showAlert('Selected reading loaded as previous reading', 'success');
+                
+                // Sync the number of sub-meter fields for current and previous readings
+                syncSubMeterFieldsManually();
             }
         } catch (error) {
             console.error('Error using history reading:', error);
-            showAlert('Failed to load selected reading', 'error');
+            UI.showAlert('Failed to load selected reading', 'error');
         }
     }
     
@@ -4179,47 +4263,43 @@ function handleNewReadingCycle() {
     }
 
     /**
-     * Updates the count of sub-meters based on visible fields
+     * Function to manually sync sub-meter fields between previous and current sections
+     * This is used after loading readings from history
      */
-    function updateSubMeterCount() {
-        // Count the current meter fields
-        const currSubMeters = document.querySelectorAll('input[id^="currSubMeter_"]');
-        
-        // Also check prev sub meters (they might have been added through loading)
-        const prevSubMeters = document.querySelectorAll('input[id^="prevSubMeter_"]');
-        
-        // Take the maximum of the two counts to ensure we have the accurate count
-        state.subMeterCount = Math.max(currSubMeters.length, prevSubMeters.length);
-        
-        // Ensure both sections have the same number of sub-meter fields
-        syncSubMeterFields();
-    }
-    
-    /**
-     * Ensures both previous and current sections have the same number of sub-meter fields
-     */
-    function syncSubMeterFields() {
+    function syncSubMeterFieldsManually() {
         const currSubMeters = document.querySelectorAll('input[id^="currSubMeter_"]');
         const prevSubMeters = document.querySelectorAll('input[id^="prevSubMeter_"]');
+        const prevSubMetersContainer = document.getElementById('prevSubMetersContainer');
+        const currSubMetersContainer = document.getElementById('currSubMetersContainer');
         
-        // If prev has more, add to current
-        if (prevSubMeters.length > currSubMeters.length) {
-            for (let i = currSubMeters.length; i < prevSubMeters.length; i++) {
-                addSubMeterFields();
-            }
+        if (!prevSubMetersContainer || !currSubMetersContainer) {
+            return;
         }
         
-        // If current has more, add to prev
-        if (currSubMeters.length > prevSubMeters.length) {
+        // If current has fewer sub-meters than previous, add more to current
+        if (currSubMeters.length < prevSubMeters.length) {
+            for (let i = currSubMeters.length; i < prevSubMeters.length; i++) {
+                // Create a similar structure to what addSubMeterFields() would do
+                const fieldContainer = document.createElement('div');
+                fieldContainer.className = 'form-group sub-meter-group';
+                fieldContainer.innerHTML = `
+                    <label for="currSubMeter_${i}">Sub Meter (kWh):</label>
+                    <input type="number" id="currSubMeter_${i}" step="0.01" min="0">
+                    <input type="text" id="subMeterLabel_${i}" placeholder="Label (e.g., Coffee Shop)">
+                `;
+                currSubMetersContainer.appendChild(fieldContainer);
+            }
+        }
+        // If previous has fewer sub-meters than current, add more to previous
+        else if (prevSubMeters.length < currSubMeters.length) {
             for (let i = prevSubMeters.length; i < currSubMeters.length; i++) {
-                // Add sub meter to prev section
-                const subMeterField = document.createElement('div');
-                subMeterField.className = 'form-group';
-                subMeterField.innerHTML = `
+                const fieldContainer = document.createElement('div');
+                fieldContainer.className = 'form-group';
+                fieldContainer.innerHTML = `
                     <label for="prevSubMeter_${i}">Sub Meter (kWh):</label>
                     <input type="number" id="prevSubMeter_${i}" step="0.01" min="0">
                 `;
-                elements.prevSubMetersContainer.appendChild(subMeterField);
+                prevSubMetersContainer.appendChild(fieldContainer);
             }
         }
     }
