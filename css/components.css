@@ -583,3 +583,16 @@ button:disabled {
 .dark-theme .date-input:focus {
     border-color: var(--primary-color);
 }
+
+.small-info {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    text-align: center;
+    font-style: italic;
+}
+
+.dark-theme .small-info {
+    color: #aaa;
+}

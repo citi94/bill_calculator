@@ -18,6 +18,10 @@
     <!-- External Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Flatpickr Date Picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
 <body>
     <div class="app-container">
@@ -28,7 +32,6 @@
         
         <nav class="tab-navigation">
             <button id="tabCalculator" class="tab-button active">Calculator</button>
-            <button id="tabHistory" class="tab-button">History</button>
             <button id="tabSettings" class="tab-button">Settings</button>
         </nav>
         
@@ -57,13 +60,12 @@
                             <input type="number" id="prevSubMeter_0" step="0.01" min="0">
                         </div>
                     </div>
-                    <div class="previous-reading-options">
-                        <button id="loadLastReadingBtn" class="secondary-button">
-                            <i class="fas fa-history"></i> Use Last Reading
-                        </button>
-                        <button id="loadFromHistoryBtn" class="secondary-button">
-                            <i class="fas fa-book"></i> Load from History
-                        </button>
+                    <div class="form-group">
+                        <label for="previousReadingSelect">Previous Readings:</label>
+                        <select id="previousReadingSelect" class="full-width">
+                            <option value="">-- Select a previous reading --</option>
+                            <!-- Will be populated dynamically -->
+                        </select>
                     </div>
                 </div>
                 
@@ -153,54 +155,22 @@
                         </button>
                     </div>
                 </div>
-            </section>
-            
-            <!-- History Tab -->
-            <section id="historyTab" class="tab-content">
-                <div class="card">
-                    <h2 class="card-title">Reading History</h2>
-                    <div class="filter-controls">
-                        <div class="form-group">
-                            <label for="historyFilter">Filter:</label>
-                            <select id="historyFilter">
-                                <option value="all">All Readings</option>
-                                <option value="lastYear">Last 12 Months</option>
-                                <option value="lastQuarter">Last 3 Months</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="table-container">
-                        <table id="historyTable" class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Main Meter</th>
-                                    <th>Sub Meter(s)</th>
-                                    <th>Usage</th>
-                                    <th>Cost</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <!-- History rows will be populated by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <div class="empty-state hidden" id="historyEmptyState">
-                        <i class="fas fa-history fa-3x"></i>
-                        <p>No reading history available yet</p>
-                    </div>
-                </div>
                 
-                <div class="button-container">
-                    <button id="exportDataBtn" class="secondary-button">
-                        <i class="fas fa-download"></i> Export All Data
-                    </button>
-                    <button id="importDataBtn" class="secondary-button">
-                        <i class="fas fa-upload"></i> Import Data
-                    </button>
+                <!-- Data Management Section -->
+                <div class="card">
+                    <h2 class="card-title">Data Management</h2>
+                    <div class="button-container">
+                        <button id="exportDataBtn" class="secondary-button">
+                            <i class="fas fa-download"></i> Export All Data
+                        </button>
+                        <button id="importDataBtn" class="secondary-button">
+                            <i class="fas fa-upload"></i> Import Data
+                        </button>
+                        <button id="clearAllDataBtn" class="danger-button">
+                            <i class="fas fa-trash"></i> Clear All Data
+                        </button>
+                    </div>
+                    <p class="small-info">Note: The import function only accepts backup files created with the Export All Data button. These files contain your readings and settings in a specific format.</p>
                     <input type="file" id="importFileInput" accept=".json" class="hidden">
                 </div>
             </section>
@@ -290,67 +260,398 @@
     <!-- Date Format Conversion Script -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Revert date inputs back to text inputs with DD-MM-YYYY format
-            function setupDateInput(dateInput, buttonId) {
-                if (!dateInput) return;
-                
-                // Change input type to text
-                dateInput.type = 'text';
-                dateInput.placeholder = 'DD-MM-YYYY';
-                dateInput.pattern = '\\d{2}-\\d{2}-\\d{4}';
-                
-                // Set up calendar button
-                const calendarBtn = document.getElementById(buttonId);
-                if (calendarBtn) {
-                    calendarBtn.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        const today = new Date();
-                        const day = String(today.getDate()).padStart(2, '0');
-                        const month = String(today.getMonth() + 1).padStart(2, '0');
-                        const year = today.getFullYear();
-                        dateInput.value = `${day}-${month}-${year}`;
-                    });
-                }
-            }
-            
-            // Setup date inputs
-            setupDateInput(document.getElementById('prevDate'), 'setPrevDateBtn');
-            setupDateInput(document.getElementById('currDate'), 'setTodayBtn');
-            
-            // Clear any existing invalid handlers
-            const prevDateBtn = document.getElementById('setPrevDateBtn');
-            const clone1 = prevDateBtn?.cloneNode(true);
-            if (clone1 && prevDateBtn && prevDateBtn.parentNode) {
-                prevDateBtn.parentNode.replaceChild(clone1, prevDateBtn);
-            }
-            
-            const todayBtn = document.getElementById('setTodayBtn');
-            const clone2 = todayBtn?.cloneNode(true);
-            if (clone2 && todayBtn && todayBtn.parentNode) {
-                todayBtn.parentNode.replaceChild(clone2, todayBtn);
-            }
-            
-            // Re-attach simple handlers
-            document.getElementById('setPrevDateBtn')?.addEventListener('click', function() {
-                console.log("setPrevDateBtn clicked (window.onload handler)");
-                const today = new Date();
-                const day = String(today.getDate()).padStart(2, '0');
-                const month = String(today.getMonth() + 1).padStart(2, '0');
-                const year = today.getFullYear();
-                
-                const prevDateInput = document.getElementById('prevDate');
-                if (prevDateInput) {
-                    prevDateInput.value = `${day}-${month}-${year}`;
-                }
+            // Initialize date pickers with Flatpickr
+            const dateInputs = document.querySelectorAll('.date-input');
+            dateInputs.forEach(input => {
+                flatpickr(input, {
+                    dateFormat: "d-m-Y",
+                    allowInput: true
+                });
             });
-            
+
+            // Set today's date for the current reading
             document.getElementById('setTodayBtn')?.addEventListener('click', function() {
                 const today = new Date();
-                const day = String(today.getDate()).padStart(2, '0');
-                const month = String(today.getMonth() + 1).padStart(2, '0');
-                const year = today.getFullYear();
-                document.getElementById('currDate').value = `${day}-${month}-${year}`;
+                const currDateInput = document.getElementById('currDate');
+                if (currDateInput && currDateInput._flatpickr) {
+                    currDateInput._flatpickr.setDate(today, true);
+                }
             });
+
+            // Set today's date for the previous reading
+            document.getElementById('setPrevDateBtn')?.addEventListener('click', function() {
+                const today = new Date();
+                const prevDateInput = document.getElementById('prevDate');
+                if (prevDateInput && prevDateInput._flatpickr) {
+                    prevDateInput._flatpickr.setDate(today, true);
+                }
+            });
+
+            // Function to ensure the date is in the correct format (DD-MM-YYYY)
+            function formatDate(dateString) {
+                if (!dateString) return '';
+                
+                // Check if it's already in DD-MM-YYYY format
+                if (/^\d{2}-\d{2}-\d{4}$/.test(dateString)) {
+                    return dateString;
+                }
+                
+                // Try to parse the date
+                const dateParts = dateString.split(/[-\/\.]/);
+                if (dateParts.length === 3) {
+                    // Assuming input might be in various formats
+                    let day, month, year;
+                    
+                    // Check if the first part looks like a year (4 digits)
+                    if (dateParts[0].length === 4) {
+                        // YYYY-MM-DD format
+                        year = dateParts[0];
+                        month = dateParts[1];
+                        day = dateParts[2];
+                    } else {
+                        // Assuming MM-DD-YYYY or DD-MM-YYYY
+                        day = dateParts[0].length <= 2 ? dateParts[0].padStart(2, '0') : dateParts[0];
+                        month = dateParts[1].length <= 2 ? dateParts[1].padStart(2, '0') : dateParts[1];
+                        year = dateParts[2].length === 2 ? `20${dateParts[2]}` : dateParts[2];
+                    }
+                    
+                    // Ensure day and month are two digits
+                    day = day.padStart(2, '0');
+                    month = month.padStart(2, '0');
+                    
+                    return `${day}-${month}-${year}`;
+                }
+                
+                // If all else fails, try to parse as Date object and format
+                try {
+                    const date = new Date(dateString);
+                    if (!isNaN(date.getTime())) {
+                        const day = String(date.getDate()).padStart(2, '0');
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const year = date.getFullYear();
+                        return `${day}-${month}-${year}`;
+                    }
+                } catch (e) {
+                    console.error('Error parsing date:', e);
+                }
+                
+                return dateString; // Return original if all parsing fails
+            }
+
+            // Apply formatting when inputs lose focus
+            dateInputs.forEach(input => {
+                input.addEventListener('blur', function() {
+                    this.value = formatDate(this.value);
+                });
+            });
+        });
+    </script>
+
+    <!-- Storage Management -->
+    <script>
+        // BillStorageManager: Handles all storage operations
+        window.BillStorageManager = {
+            // Keys for localStorage
+            KEYS: {
+                READINGS: 'electricity_readings',
+                SETTINGS: 'electricity_settings',
+                BACKUP: 'electricity_backup'
+            },
+            
+            // Initialize storage
+            init: function() {
+                console.log('Initializing BillStorageManager with localStorage');
+                // Create empty structures if they don't exist
+                if (!localStorage.getItem(this.KEYS.READINGS)) {
+                    localStorage.setItem(this.KEYS.READINGS, JSON.stringify([]));
+                }
+                
+                if (!localStorage.getItem(this.KEYS.SETTINGS)) {
+                    const defaultSettings = {
+                        defaultRatePerKwh: 28.0,
+                        defaultStandingCharge: 53.0,
+                        darkMode: false,
+                        roundedValues: true,
+                        propertyName: 'My Property',
+                        propertyAddress: ''
+                    };
+                    localStorage.setItem(this.KEYS.SETTINGS, JSON.stringify(defaultSettings));
+                }
+            },
+            
+            // Get all readings
+            getAllReadings: async function() {
+                try {
+                    console.log('Getting all readings from localStorage');
+                    const readings = JSON.parse(localStorage.getItem(this.KEYS.READINGS) || '[]');
+                    return readings;
+                } catch (error) {
+                    console.error('Error getting readings:', error);
+                    return [];
+                }
+            },
+            
+            // Get the most recent reading
+            getLastReading: async function() {
+                try {
+                    const readings = await this.getAllReadings();
+                    if (readings.length === 0) {
+                        // Return empty object without showing popup
+                        return null;
+                    }
+                    
+                    // Sort by date, newest first
+                    readings.sort((a, b) => new Date(b.currentDate || b.date || 0) - new Date(a.currentDate || a.date || 0));
+                    return readings[0];
+                } catch (error) {
+                    console.error('Error getting last reading:', error);
+                    return null;
+                }
+            },
+            
+            // Alias for getLastReading to match function names in app-combined.js
+            getMostRecentReading: async function() {
+                return this.getLastReading();
+            },
+            
+            // Save a new reading
+            saveReading: async function(readingData) {
+                try {
+                    const readings = await this.getAllReadings();
+                    
+                    // Generate a unique ID using timestamp and random string
+                    readingData.id = `reading_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+                    
+                    readings.push(readingData);
+                    localStorage.setItem(this.KEYS.READINGS, JSON.stringify(readings));
+                    
+                    return { success: true, message: 'Reading saved successfully' };
+                } catch (error) {
+                    console.error('Error saving reading:', error);
+                    return { success: false, message: 'Failed to save reading: ' + error.message };
+                }
+            },
+            
+            // Get settings
+            getSettings: function() {
+                try {
+                    return JSON.parse(localStorage.getItem(this.KEYS.SETTINGS) || '{}');
+                } catch (error) {
+                    console.error('Error getting settings:', error);
+                    return {};
+                }
+            },
+            
+            // Get a specific setting by key
+            getSetting: function(key, defaultValue = null) {
+                try {
+                    const settings = this.getSettings();
+                    return settings[key] !== undefined ? settings[key] : defaultValue;
+                } catch (error) {
+                    console.error(`Error getting setting ${key}:`, error);
+                    return defaultValue;
+                }
+            },
+            
+            // Save settings
+            saveSettings: function(settingsData) {
+                try {
+                    localStorage.setItem(this.KEYS.SETTINGS, JSON.stringify(settingsData));
+                    return true;
+                } catch (error) {
+                    console.error('Error saving settings:', error);
+                    return false;
+                }
+            },
+            
+            // Create a backup of all data
+            createBackup: function() {
+                try {
+                    console.log('Creating backup of all data');
+                    
+                    // Get the readings
+                    const readings = JSON.parse(localStorage.getItem(this.KEYS.READINGS) || '[]');
+                    console.log(`Found ${readings.length} readings to backup`);
+                    
+                    // Get the settings
+                    const settings = JSON.parse(localStorage.getItem(this.KEYS.SETTINGS) || '{}');
+                    
+                    // Normalize readings to ensure compatibility
+                    const normalizedReadings = readings.map(reading => {
+                        // Ensure each reading has essential fields using consistent naming
+                        return {
+                            id: reading.id || `reading_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`,
+                            date: reading.date || reading.currentDate,
+                            currentDate: reading.currentDate || reading.date, 
+                            mainMeter: reading.mainMeter || reading.currentMainReading || 0,
+                            currentMainReading: reading.currentMainReading || reading.mainMeter || 0,
+                            subMeters: reading.subMeters || reading.currentSubReadings || [],
+                            currentSubReadings: reading.currentSubReadings || reading.subMeters || [],
+                            timestamp: reading.timestamp || Date.now()
+                        };
+                    });
+                    
+                    const backup = {
+                        readings: normalizedReadings,
+                        settings: settings,
+                        timestamp: new Date().toISOString(),
+                        version: '1.0'
+                    };
+                    
+                    console.log('Backup created successfully');
+                    return backup;
+                } catch (error) {
+                    console.error('Error creating backup:', error);
+                    return { 
+                        readings: [],
+                        settings: {},
+                        timestamp: new Date().toISOString(),
+                        version: '1.0',
+                        error: error.message
+                    };
+                }
+            },
+            
+            // Restore from backup
+            restoreFromBackup: function(backupData) {
+                try {
+                    if (backupData.readings) {
+                        localStorage.setItem(this.KEYS.READINGS, JSON.stringify(backupData.readings));
+                    }
+                    
+                    if (backupData.settings) {
+                        localStorage.setItem(this.KEYS.SETTINGS, JSON.stringify(backupData.settings));
+                    }
+                    
+                    return { success: true, message: 'Data restored successfully' };
+                } catch (error) {
+                    console.error('Error restoring backup:', error);
+                    return { success: false, message: 'Failed to restore: ' + error.message };
+                }
+            },
+            
+            // Export all data (alias for appCombined.js compatibility)
+            exportData: function() {
+                return this.createBackup();
+            },
+            
+            // Import data (alias for appCombined.js compatibility)
+            importData: function(data) {
+                try {
+                    console.log('Importing data, type:', typeof data);
+                    
+                    // Check if data has expected structure
+                    if (!data) {
+                        console.error('Import data is null or undefined');
+                        return { success: false, message: 'Invalid data format: data is empty' };
+                    }
+                    
+                    // Log all top-level keys for debugging
+                    console.log('Data keys:', Object.keys(data));
+                    
+                    // Check for common non-backup file formats
+                    if (data.name && data.version && (data.dependencies || data.packages)) {
+                        console.error('This appears to be a Node.js package file (package.json or package-lock.json), not a bill calculator backup');
+                        return { success: false, message: 'Invalid file: This appears to be a package.json file, not a backup file' };
+                    }
+                    
+                    // Check for other common file types that might be selected by mistake
+                    if (data.type === 'Buffer' || data.data instanceof Array) {
+                        console.error('This appears to be a Buffer or binary data, not a backup file');
+                        return { success: false, message: 'Invalid file format: Binary data detected' };
+                    }
+                    
+                    // Handle different data formats
+                    if (data.readings && Array.isArray(data.readings)) {
+                        // Standard format with readings array
+                        console.log(`Importing ${data.readings.length} readings (standard format)`);
+                        if (data.readings.length === 0) {
+                            console.warn('Readings array is empty');
+                        } else {
+                            console.log('First reading:', data.readings[0]);
+                        }
+                        localStorage.setItem(this.KEYS.READINGS, JSON.stringify(data.readings));
+                    } else if (Array.isArray(data)) {
+                        // Maybe data is just an array of readings
+                        console.log(`Importing ${data.length} readings (array format)`);
+                        localStorage.setItem(this.KEYS.READINGS, JSON.stringify(data));
+                    } else {
+                        // Check if the whole object might be a single reading
+                        if (data.id || data.date || data.currentDate || 
+                            data.mainMeter || data.currentMainReading) {
+                            console.log('Importing single reading object');
+                            localStorage.setItem(this.KEYS.READINGS, JSON.stringify([data]));
+                        } else {
+                            console.error('No readings found in import data');
+                            console.error('Data structure:', JSON.stringify(data, null, 2).substring(0, 500));
+                            return { success: false, message: 'No readings found in import data. Please select a valid backup file.' };
+                        }
+                    }
+                    
+                    // Import settings if available
+                    if (data.settings) {
+                        console.log('Importing settings:', data.settings);
+                        localStorage.setItem(this.KEYS.SETTINGS, JSON.stringify(data.settings));
+                    }
+                    
+                    console.log('Import completed successfully');
+                    return { success: true, message: 'Data imported successfully' };
+                } catch (error) {
+                    console.error('Error importing data:', error);
+                    return { success: false, message: 'Error importing data: ' + error.message };
+                }
+            },
+            
+            // Clear all data
+            clearAllData: function() {
+                try {
+                    // Create backup before clearing
+                    const backup = this.createBackup();
+                    localStorage.setItem(this.KEYS.BACKUP, JSON.stringify(backup));
+                    
+                    // Clear data
+                    localStorage.setItem(this.KEYS.READINGS, JSON.stringify([]));
+                    
+                    // Don't clear settings
+                    return { success: true, message: 'Data cleared successfully (backup saved)' };
+                } catch (error) {
+                    console.error('Error clearing data:', error);
+                    return { success: false, message: 'Failed to clear data: ' + error.message };
+                }
+            },
+            
+            // Get storage usage statistics
+            getStorageUsage: function() {
+                try {
+                    const readings = localStorage.getItem(this.KEYS.READINGS) || '[]';
+                    const settings = localStorage.getItem(this.KEYS.SETTINGS) || '{}';
+                    const backup = localStorage.getItem(this.KEYS.BACKUP) || '{}';
+                    
+                    const totalSize = (readings.length + settings.length + backup.length) / 1024; // KB
+                    const readingsCount = JSON.parse(readings).length;
+                    
+                    return {
+                        totalSize: totalSize.toFixed(2) + ' KB',
+                        readingsCount: readingsCount,
+                        limit: '5120 KB (5MB)'
+                    };
+                } catch (error) {
+                    console.error('Error calculating storage usage:', error);
+                    return {
+                        totalSize: 'Error calculating',
+                        readingsCount: 'Unknown',
+                        limit: '5120 KB (5MB)'
+                    };
+                }
+            }
+        };
+        
+        // Initialize storage on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing BillStorageManager');
+            if (window.BillStorageManager && window.BillStorageManager.init) {
+                window.BillStorageManager.init();
+            }
         });
     </script>
     
@@ -360,13 +661,19 @@
         window.setPreviousDate = function() {
             console.log("Global setPreviousDate called");
             const today = new Date();
-            const day = String(today.getDate()).padStart(2, '0');
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const year = today.getFullYear();
             
             const prevDateInput = document.getElementById('prevDate');
             if (prevDateInput) {
-                prevDateInput.value = `${day}-${month}-${year}`;
+                // Check if the input has a flatpickr instance
+                if (prevDateInput._flatpickr) {
+                    prevDateInput._flatpickr.setDate(today, true);
+                } else {
+                    // Fallback to manual formatting
+                    const day = String(today.getDate()).padStart(2, '0');
+                    const month = String(today.getMonth() + 1).padStart(2, '0');
+                    const year = today.getFullYear();
+                    prevDateInput.value = `${day}-${month}-${year}`;
+                }
             }
         };
         
@@ -506,15 +813,20 @@
                             BillStorageManager.getMostRecentReading().then(function(mostRecentReading) {
                                 if (mostRecentReading) {
                                     const date = new Date(mostRecentReading.currentDate);
-                                    const day = String(date.getDate()).padStart(2, '0');
-                                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                                    const year = date.getFullYear();
-                                    const formattedDate = `${day}-${month}-${year}`;
                                     
-                                    // Set previous date with DD-MM-YYYY format
+                                    // Set previous date using flatpickr if available
                                     const prevDateInput = document.getElementById('prevDate');
                                     if (prevDateInput) {
-                                        prevDateInput.value = formattedDate;
+                                        // Check if the input has a flatpickr instance
+                                        if (prevDateInput._flatpickr) {
+                                            prevDateInput._flatpickr.setDate(date, true);
+                                        } else {
+                                            // Fallback to manual formatting
+                                            const day = String(date.getDate()).padStart(2, '0');
+                                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                                            const year = date.getFullYear();
+                                            prevDateInput.value = `${day}-${month}-${year}`;
+                                        }
                                     }
                                     
                                     // Set meter readings
@@ -553,24 +865,6 @@
                         }
                     }, true);
                 }
-                
-                // Load from History button
-                const loadFromHistoryBtn = document.getElementById('loadFromHistoryBtn');
-                if (loadFromHistoryBtn) {
-                    console.log("Adding click handler to loadFromHistoryBtn");
-                    loadFromHistoryBtn.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        console.log("loadFromHistoryBtn clicked");
-                        
-                        if (window.showLoadFromHistoryModal) {
-                            window.showLoadFromHistoryModal();
-                        } else if (window.UI && UI.showAlert) {
-                            UI.showAlert('History loading functionality not available', 'warning');
-                        } else {
-                            alert('History loading functionality not available');
-                        }
-                    }, true);
-                }
             });
         })();
     </script>
@@ -596,40 +890,41 @@
             // Previous date button
             document.getElementById('setPrevDateBtn')?.addEventListener('click', function() {
                 console.log("setPrevDateBtn clicked (window.onload handler)");
-                
-                // Get today's date in ISO format
                 const today = new Date();
-                const formattedDate = today.toISOString().split('T')[0];
                 
-                // Try both the original and the _picker version
-                const prevDatePicker = document.getElementById('prevDate_picker');
-                if (prevDatePicker) {
-                    prevDatePicker.value = formattedDate;
-                    // Trigger change event to update the visible input
-                    const event = new Event('change');
-                    prevDatePicker.dispatchEvent(event);
-                } else {
-                    // Fallback to the original ID
-                    const prevDateInput = document.getElementById('prevDate');
-                    if (prevDateInput) {
-                        prevDateInput.value = formattedDate;
-                        
-                        // If it's a date input and we need DD-MM-YYYY format
-                        if (prevDateInput.type === 'date') {
-                            try {
-                                // Convert to DD-MM-YYYY
-                                const [year, month, day] = formattedDate.split('-');
-                                const ddmmyyyyDate = `${day}-${month}-${year}`;
-                                
-                                // Update any hidden formatted input
-                                const formattedInput = document.getElementById('prevDate_formatted');
-                                if (formattedInput) {
-                                    formattedInput.value = ddmmyyyyDate;
-                                }
-                            } catch (e) {
-                                console.error('Error converting date format:', e);
-                            }
-                        }
+                const prevDateInput = document.getElementById('prevDate');
+                if (prevDateInput) {
+                    // Check if the input has a flatpickr instance
+                    if (prevDateInput._flatpickr) {
+                        prevDateInput._flatpickr.setDate(today, true);
+                        prevDateInput._flatpickr.open();
+                    } else {
+                        // Fallback to direct formatting
+                        const day = String(today.getDate()).padStart(2, '0');
+                        const month = String(today.getMonth() + 1).padStart(2, '0');
+                        const year = today.getFullYear();
+                        prevDateInput.value = `${day}-${month}-${year}`;
+                    }
+                }
+            });
+            
+            // Current date button
+            document.getElementById('setTodayBtn')?.addEventListener('click', function() {
+                console.log("setTodayBtn clicked (window.onload handler)");
+                const today = new Date();
+                
+                const currDateInput = document.getElementById('currDate');
+                if (currDateInput) {
+                    // Check if the input has a flatpickr instance
+                    if (currDateInput._flatpickr) {
+                        currDateInput._flatpickr.setDate(today, true);
+                        currDateInput._flatpickr.open();
+                    } else {
+                        // Fallback to direct formatting
+                        const day = String(today.getDate()).padStart(2, '0');
+                        const month = String(today.getMonth() + 1).padStart(2, '0');
+                        const year = today.getFullYear();
+                        currDateInput.value = `${day}-${month}-${year}`;
                     }
                 }
             });
@@ -655,7 +950,219 @@
             });
         });
     </script>
-<script src="js/diagnostic.js"></script>
-<script src="js/dom-inspector.js"></script>
+    
+    <!-- Previous Readings Dropdown Handler -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Function to parse date in DD-MM-YYYY format
+            function parseDDMMYYYY(dateStr) {
+                if (!dateStr) return new Date(); // Default to today
+                
+                // Handle DD-MM-YYYY format
+                if (typeof dateStr === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+                    const [day, month, year] = dateStr.split('-').map(Number);
+                    // Note: month is 0-indexed in JavaScript Date
+                    return new Date(year, month - 1, day);
+                }
+                
+                // Fallback to standard parsing
+                return new Date(dateStr);
+            }
+            
+            // Function to populate the previous readings dropdown
+            async function populatePreviousReadings() {
+                console.log('Populating previous readings dropdown...');
+                const previousReadingSelect = document.getElementById('previousReadingSelect');
+                if (!previousReadingSelect) {
+                    console.warn('Previous reading select element not found');
+                    return;
+                }
+                
+                try {
+                    // Make sure BillStorageManager exists before trying to use it
+                    if (!window.BillStorageManager || !window.BillStorageManager.getAllReadings) {
+                        console.error('BillStorageManager.getAllReadings not available');
+                        return;
+                    }
+                    
+                    // Clear existing options, keeping only the default
+                    const defaultOption = previousReadingSelect.options[0];
+                    previousReadingSelect.innerHTML = '';
+                    previousReadingSelect.appendChild(defaultOption);
+                    
+                    // Get all readings from storage
+                    const readings = await BillStorageManager.getAllReadings();
+                    if (!readings || readings.length === 0) {
+                        console.log('No previous readings found');
+                        return;
+                    }
+                    
+                    // Sort readings by date, newest first
+                    readings.sort((a, b) => {
+                        const dateA = parseDDMMYYYY(b.currentDate || b.date);
+                        const dateB = parseDDMMYYYY(a.currentDate || a.date);
+                        return dateA - dateB;
+                    });
+                    
+                    // Add each reading to the dropdown
+                    readings.forEach((reading, index) => {
+                        try {
+                            const date = parseDDMMYYYY(reading.currentDate || reading.date);
+                            
+                            // Format date as DD-MM-YYYY
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const year = date.getFullYear();
+                            const formattedDate = `${day}-${month}-${year}`;
+                            
+                            const option = document.createElement('option');
+                            option.value = reading.id || index.toString();
+                            option.textContent = `${formattedDate} - Main: ${reading.currentMainReading || reading.mainMeter} kWh`;
+                            previousReadingSelect.appendChild(option);
+                        } catch (error) {
+                            console.error('Error formatting date for reading:', reading, error);
+                        }
+                    });
+                    
+                    // Automatically select the most recent reading that's at least a week old
+                    const oneWeekAgo = new Date();
+                    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                    
+                    const suitableReading = readings.find(reading => {
+                        const readingDate = parseDDMMYYYY(reading.currentDate || reading.date);
+                        return readingDate < oneWeekAgo;
+                    });
+                    
+                    if (suitableReading) {
+                        previousReadingSelect.value = suitableReading.id || readings.indexOf(suitableReading).toString();
+                        // Trigger change event to load the reading
+                        const event = new Event('change');
+                        previousReadingSelect.dispatchEvent(event);
+                    }
+                } catch (error) {
+                    console.error('Error populating previous readings:', error);
+                }
+            }
+            
+            // Handle selection of a previous reading
+            document.getElementById('previousReadingSelect')?.addEventListener('change', async function() {
+                const selectedValue = this.value;
+                if (!selectedValue) return;
+                
+                try {
+                    // Make sure BillStorageManager exists before trying to use it
+                    if (!window.BillStorageManager || !window.BillStorageManager.getAllReadings) {
+                        console.error('BillStorageManager.getAllReadings not available');
+                        return;
+                    }
+                    
+                    // Get all readings
+                    const readings = await BillStorageManager.getAllReadings();
+                    if (!readings || readings.length === 0) return;
+                    
+                    // Find the selected reading
+                    const selectedReading = readings.find(reading => 
+                        reading.id === selectedValue || readings.indexOf(reading).toString() === selectedValue
+                    );
+                    
+                    if (!selectedReading) return;
+                    
+                    // Parse the date properly from DD-MM-YYYY format
+                    const dateStr = selectedReading.currentDate || selectedReading.date;
+                    let date;
+                    
+                    if (typeof dateStr === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+                        // Handle DD-MM-YYYY format
+                        const [day, month, year] = dateStr.split('-').map(Number);
+                        date = new Date(year, month - 1, day); // Month is 0-indexed in JS
+                    } else {
+                        // Fallback to standard parsing
+                        date = new Date(dateStr);
+                    }
+                    
+                    const prevDateInput = document.getElementById('prevDate');
+                    
+                    if (prevDateInput) {
+                        // Check if the input has a flatpickr instance
+                        if (prevDateInput._flatpickr) {
+                            prevDateInput._flatpickr.setDate(date, true);
+                        } else {
+                            // Fallback to manual formatting
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const year = date.getFullYear();
+                            prevDateInput.value = `${day}-${month}-${year}`;
+                        }
+                    }
+                    
+                    // Set main meter reading
+                    const prevMainMeterEl = document.getElementById('prevMainMeter');
+                    if (prevMainMeterEl) {
+                        prevMainMeterEl.value = selectedReading.currentMainReading || selectedReading.mainMeter;
+                    }
+                    
+                    // Set sub-meter readings
+                    const prevSubMetersContainer = document.getElementById('prevSubMetersContainer');
+                    const subReadings = selectedReading.currentSubReadings || selectedReading.subMeters;
+                    
+                    if (prevSubMetersContainer && subReadings) {
+                        prevSubMetersContainer.innerHTML = '';
+                        subReadings.forEach((reading, index) => {
+                            const subMeterField = document.createElement('div');
+                            subMeterField.className = 'form-group';
+                            subMeterField.innerHTML = `
+                                <label for="prevSubMeter_${index}">Sub Meter (kWh):</label>
+                                <input type="number" id="prevSubMeter_${index}" step="0.01" min="0" value="${reading}">
+                            `;
+                            prevSubMetersContainer.appendChild(subMeterField);
+                        });
+                    }
+                    
+                    // Show a success message
+                    const alertBox = document.getElementById('alertBox');
+                    if (alertBox) {
+                        alertBox.className = 'alert alert-success';
+                        alertBox.textContent = 'Previous reading loaded';
+                        alertBox.classList.remove('hidden');
+                        setTimeout(() => alertBox.classList.add('hidden'), 3000);
+                    }
+                } catch (error) {
+                    console.error('Error loading selected reading:', error);
+                }
+            });
+            
+            // Initialize BillStorageManager if not yet initialized
+            if (window.BillStorageManager && window.BillStorageManager.init) {
+                try {
+                    window.BillStorageManager.init();
+                    console.log('BillStorageManager initialized');
+                } catch (error) {
+                    console.error('Error initializing BillStorageManager:', error);
+                }
+            }
+            
+            // Delay dropdown population until storage is ready
+            setTimeout(() => {
+                populatePreviousReadings();
+            }, 500);
+            
+            // Update the dropdown when readings are saved or imported
+            document.getElementById('saveReadingBtn')?.addEventListener('click', function() {
+                // Wait a bit for the save to complete
+                setTimeout(populatePreviousReadings, 500);
+            });
+            
+            document.getElementById('importDataBtn')?.addEventListener('click', function() {
+                // Wait a bit for the import to complete
+                setTimeout(populatePreviousReadings, 1000);
+            });
+            
+            // Listen for custom refresh event
+            document.getElementById('previousReadingSelect')?.addEventListener('refresh-dropdown', function() {
+                console.log('Refresh dropdown event received');
+                setTimeout(populatePreviousReadings, 500);
+            });
+        });
+    </script>
 </body>
 </html>

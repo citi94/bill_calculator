@@ -376,564 +376,118 @@ window.BillValidator = BillValidator;
 
 
 // ====== STORAGE MODULE ======
-const BillStorageManager = (function() {
-    // Database configuration
-    const DB_NAME = 'ElectricityBillCalculator';
-    const DB_VERSION = 1;
-    const STORES = {
-        READINGS: 'readings',
-        SETTINGS: 'settings',
-        METERS: 'meters'
-    };
-    
-    // Local variables
-    let db = null;
-    let isUsingFallback = false;
-    
-    /**
-     * Initialize the database connection
-     * @returns {Promise} Resolves when database is ready
-     */
-    function init() {
-        return new Promise((resolve, reject) => {
-            // Check if IndexedDB is supported
-            if (!window.indexedDB) {
-                console.warn('IndexedDB not supported, falling back to localStorage');
-                isUsingFallback = true;
-                setupLocalStorageFallback();
-                resolve();
-                return;
-            }
-            
-            // Open database connection
-            const request = window.indexedDB.open(DB_NAME, DB_VERSION);
-            
-            request.onerror = (event) => {
-                console.error('IndexedDB error:', event.target.error);
-                isUsingFallback = true;
-                setupLocalStorageFallback();
-                resolve();
-            };
-            
-            request.onsuccess = (event) => {
-                db = event.target.result;
-                console.log('Database connection established');
-                resolve();
-            };
-            
-            request.onupgradeneeded = (event) => {
-                const db = event.target.result;
-                
-                // Create object stores if they don't exist
-                if (!db.objectStoreNames.contains(STORES.READINGS)) {
-                    const readingsStore = db.createObjectStore(STORES.READINGS, { keyPath: 'id', autoIncrement: true });
-                    readingsStore.createIndex('date', 'date', { unique: false });
-                }
-                
-                if (!db.objectStoreNames.contains(STORES.SETTINGS)) {
-                    db.createObjectStore(STORES.SETTINGS, { keyPath: 'key' });
-                }
-                
-                if (!db.objectStoreNames.contains(STORES.METERS)) {
-                    db.createObjectStore(STORES.METERS, { keyPath: 'id' });
-                }
-                
-                console.log('Database schema updated');
-            };
-        });
-    }
-    
-    /**
-     * Set up localStorage fallback mechanism
-     * Creates empty structures if they don't exist
-     */
-    function setupLocalStorageFallback() {
-        if (!localStorage.getItem(STORES.READINGS)) {
-            localStorage.setItem(STORES.READINGS, JSON.stringify([]));
-        }
-        
-        if (!localStorage.getItem(STORES.SETTINGS)) {
-            localStorage.setItem(STORES.SETTINGS, JSON.stringify({}));
-        }
-        
-        if (!localStorage.getItem(STORES.METERS)) {
-            localStorage.setItem(STORES.METERS, JSON.stringify([]));
-        }
-    }
-    
-    /**
-     * Save a reading to the database
-     * @param {Object} reading The reading data to save
-     * @returns {Promise} Resolves with the saved reading (including generated ID)
-     */
-    function saveReading(reading) {
-        // Ensure reading has a timestamp if not provided
-        if (!reading.timestamp) {
-            reading.timestamp = new Date().getTime();
-        }
-        
-        if (isUsingFallback) {
-            return new Promise((resolve) => {
-                const readings = JSON.parse(localStorage.getItem(STORES.READINGS));
-                reading.id = Date.now(); // Generate a unique ID
-                readings.push(reading);
-                localStorage.setItem(STORES.READINGS, JSON.stringify(readings));
-                resolve(reading);
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORES.READINGS], 'readwrite');
-            const store = transaction.objectStore(STORES.READINGS);
-            const request = store.add(reading);
-            
-            request.onsuccess = (event) => {
-                // Get the ID of the newly added reading
-                reading.id = event.target.result;
-                resolve(reading);
-            };
-            
-            request.onerror = (event) => {
-                reject(event.target.error);
-            };
-        });
-    }
-    
-    /**
-     * Get all readings from the database
-     * @returns {Promise} Resolves with an array of readings
-     */
-    function getAllReadings() {
-        if (isUsingFallback) {
-            return new Promise((resolve) => {
-                const readings = JSON.parse(localStorage.getItem(STORES.READINGS));
-                resolve(readings);
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORES.READINGS], 'readonly');
-            const store = transaction.objectStore(STORES.READINGS);
-            const request = store.getAll();
-            
-            request.onsuccess = () => {
-                resolve(request.result);
-            };
-            
-            request.onerror = (event) => {
-                reject(event.target.error);
-            };
-        });
-    }
-    
-    /**
-     * Get readings within a date range
-     * @param {Date} startDate Start date
-     * @param {Date} endDate End date
-     * @returns {Promise} Resolves with an array of readings
-     */
-    function getReadingsByDateRange(startDate, endDate) {
-        if (isUsingFallback) {
-            return new Promise((resolve) => {
-                const readings = JSON.parse(localStorage.getItem(STORES.READINGS));
-                const filteredReadings = readings.filter((reading) => {
-                    const readingDate = new Date(reading.date);
-                    return readingDate >= startDate && readingDate <= endDate;
-                });
-                resolve(filteredReadings);
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            getAllReadings()
-                .then((readings) => {
-                    const filteredReadings = readings.filter((reading) => {
-                        const readingDate = new Date(reading.date);
-                        return readingDate >= startDate && readingDate <= endDate;
-                    });
-                    resolve(filteredReadings);
-                })
-                .catch((error) => {
-                    reject(error);
-                });
-        });
-    }
-    
-    /**
-     * Get the most recent reading
-     * @returns {Promise} Resolves with the most recent reading or null if none exists
-     */
-    function getMostRecentReading() {
-        return getAllReadings()
-            .then((readings) => {
-                if (readings.length === 0) {
-                    return null;
-                }
-                
-                // Sort readings by date (newest first)
-                readings.sort((a, b) => {
-                    return new Date(b.date) - new Date(a.date);
-                });
-                
-                return readings[0];
-            });
-    }
-    
-    /**
-     * Delete a reading by ID
-     * @param {number} id The ID of the reading to delete
-     * @returns {Promise} Resolves when the reading is deleted
-     */
-    function deleteReading(id) {
-        if (isUsingFallback) {
-            return new Promise((resolve) => {
-                const readings = JSON.parse(localStorage.getItem(STORES.READINGS));
-                const updatedReadings = readings.filter((reading) => reading.id !== id);
-                localStorage.setItem(STORES.READINGS, JSON.stringify(updatedReadings));
-                resolve();
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORES.READINGS], 'readwrite');
-            const store = transaction.objectStore(STORES.READINGS);
-            const request = store.delete(id);
-            
-            request.onsuccess = () => {
-                resolve();
-            };
-            
-            request.onerror = (event) => {
-                reject(event.target.error);
-            };
-        });
-    }
-    
-    /**
-     * Save a setting
-     * @param {string} key The setting key
-     * @param {any} value The setting value
-     * @returns {Promise} Resolves when the setting is saved
-     */
-    function saveSetting(key, value) {
-        if (isUsingFallback) {
-            return new Promise((resolve) => {
-                const settings = JSON.parse(localStorage.getItem(STORES.SETTINGS));
-                settings[key] = value;
-                localStorage.setItem(STORES.SETTINGS, JSON.stringify(settings));
-                resolve();
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORES.SETTINGS], 'readwrite');
-            const store = transaction.objectStore(STORES.SETTINGS);
-            const request = store.put({ key, value });
-            
-            request.onsuccess = () => {
-                resolve();
-            };
-            
-            request.onerror = (event) => {
-                reject(event.target.error);
-            };
-        });
-    }
-    
-    /**
-     * Get a setting by key
-     * @param {string} key The setting key
-     * @param {any} defaultValue Default value if setting doesn't exist
-     * @returns {Promise} Resolves with the setting value or defaultValue if not found
-     */
-    function getSetting(key, defaultValue = null) {
-        if (isUsingFallback) {
-            return new Promise((resolve) => {
-                const settings = JSON.parse(localStorage.getItem(STORES.SETTINGS));
-                resolve(settings[key] !== undefined ? settings[key] : defaultValue);
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORES.SETTINGS], 'readonly');
-            const store = transaction.objectStore(STORES.SETTINGS);
-            const request = store.get(key);
-            
-            request.onsuccess = () => {
-                if (request.result) {
-                    resolve(request.result.value);
-                } else {
-                    resolve(defaultValue);
-                }
-            };
-            
-            request.onerror = (event) => {
-                reject(event.target.error);
-            };
-        });
-    }
-    
-    /**
-     * Save meter configuration
-     * @param {Object} meter The meter configuration
-     * @returns {Promise} Resolves when the meter is saved
-     */
-    function saveMeter(meter) {
-        if (!meter.id) {
-            meter.id = Date.now().toString();
-        }
-        
-        if (isUsingFallback) {
-            return new Promise((resolve) => {
-                const meters = JSON.parse(localStorage.getItem(STORES.METERS));
-                const existingIndex = meters.findIndex(m => m.id === meter.id);
-                
-                if (existingIndex >= 0) {
-                    meters[existingIndex] = meter;
-                } else {
-                    meters.push(meter);
-                }
-                
-                localStorage.setItem(STORES.METERS, JSON.stringify(meters));
-                resolve(meter);
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORES.METERS], 'readwrite');
-            const store = transaction.objectStore(STORES.METERS);
-            const request = store.put(meter);
-            
-            request.onsuccess = () => {
-                resolve(meter);
-            };
-            
-            request.onerror = (event) => {
-                reject(event.target.error);
-            };
-        });
-    }
-    
-    /**
-     * Get all meters
-     * @returns {Promise} Resolves with an array of meters
-     */
-    function getAllMeters() {
-        if (isUsingFallback) {
-            return new Promise((resolve) => {
-                const meters = JSON.parse(localStorage.getItem(STORES.METERS));
-                resolve(meters);
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORES.METERS], 'readonly');
-            const store = transaction.objectStore(STORES.METERS);
-            const request = store.getAll();
-            
-            request.onsuccess = () => {
-                resolve(request.result);
-            };
-            
-            request.onerror = (event) => {
-                reject(event.target.error);
-            };
-        });
-    }
-    
-    /**
-     * Delete a meter by ID
-     * @param {string} id The ID of the meter to delete
-     * @returns {Promise} Resolves when the meter is deleted
-     */
-    function deleteMeter(id) {
-        if (isUsingFallback) {
-            return new Promise((resolve) => {
-                const meters = JSON.parse(localStorage.getItem(STORES.METERS));
-                const updatedMeters = meters.filter((meter) => meter.id !== id);
-                localStorage.setItem(STORES.METERS, JSON.stringify(updatedMeters));
-                resolve();
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORES.METERS], 'readwrite');
-            const store = transaction.objectStore(STORES.METERS);
-            const request = store.delete(id);
-            
-            request.onsuccess = () => {
-                resolve();
-            };
-            
-            request.onerror = (event) => {
-                reject(event.target.error);
-            };
-        });
-    }
-    
-    /**
-     * Clear all data
-     * @returns {Promise} Resolves when all data is cleared
-     */
-    function clearAllData() {
-        if (isUsingFallback) {
-            return new Promise((resolve) => {
-                localStorage.removeItem(STORES.READINGS);
-                localStorage.removeItem(STORES.SETTINGS);
-                localStorage.removeItem(STORES.METERS);
-                setupLocalStorageFallback();
-                resolve();
-            });
-        }
-        
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORES.READINGS, STORES.SETTINGS, STORES.METERS], 'readwrite');
-            
-            let completedStores = 0;
-            const totalStores = 3;
-            
-            transaction.oncomplete = () => {
-                resolve();
-            };
-            
-            transaction.onerror = (event) => {
-                reject(event.target.error);
-            };
-            
-            const clearStore = (storeName) => {
-                const store = transaction.objectStore(storeName);
-                const request = store.clear();
-                
-                request.onsuccess = () => {
-                    completedStores++;
-                    if (completedStores === totalStores) {
-                        resolve();
+// BillStorageManager is defined in index.html using localStorage
+// This section was previously creating a duplicate definition causing errors
+// Instead of defining it here, we'll just check if it exists and use it
+
+// Add a check to ensure BillStorageManager exists before trying to use it
+(function() {
+    // Wait for DOM to be ready
+    document.addEventListener('DOMContentLoaded', function() {
+        if (!window.BillStorageManager) {
+            console.error('BillStorageManager not found. The storage functionality may be limited.');
+            // Create minimal fallback if missing
+            window.BillStorageManager = {
+                init: function() {
+                    console.log('Initializing fallback storage manager');
+                    // Create empty structures if they don't exist
+                    if (!localStorage.getItem('electricity_readings')) {
+                        localStorage.setItem('electricity_readings', JSON.stringify([]));
                     }
-                };
-            };
-            
-            clearStore(STORES.READINGS);
-            clearStore(STORES.SETTINGS);
-            clearStore(STORES.METERS);
-        });
-    }
-    
-    /**
-     * Export all data
-     * @returns {Promise} Resolves with all data as a JSON object
-     */
-    function exportData() {
-        return Promise.all([
-            getAllReadings(),
-            getAllMeters(),
-            (async () => {
-                const settings = {};
-                // Get common settings
-                settings.darkMode = await getSetting('darkMode', false);
-                settings.defaultRatePerKwh = await getSetting('defaultRatePerKwh', 28);
-                settings.defaultStandingCharge = await getSetting('defaultStandingCharge', 140);
-                settings.propertyName = await getSetting('propertyName', 'My Property');
-                settings.propertyAddress = await getSetting('propertyAddress', '');
-                settings.roundedValues = await getSetting('roundedValues', true);
-                
-                return settings;
-            })()
-        ]).then(([readings, meters, settings]) => {
-            return {
-                version: 1,
-                exportDate: new Date().toISOString(),
-                readings,
-                meters,
-                settings
-            };
-        });
-    }
-    
-    /**
-     * Import data
-     * @param {Object} data The data to import
-     * @returns {Promise} Resolves when the import is complete
-     */
-    function importData(data) {
-        if (!data || !data.version || !data.readings) {
-            return Promise.reject(new Error('Invalid data format'));
-        }
-        
-        return clearAllData()
-            .then(() => {
-                const promises = [];
-                
-                // Import readings
-                if (data.readings && Array.isArray(data.readings)) {
-                    data.readings.forEach((reading) => {
-                        promises.push(saveReading(reading));
-                    });
-                }
-                
-                // Import meters
-                if (data.meters && Array.isArray(data.meters)) {
-                    data.meters.forEach((meter) => {
-                        promises.push(saveMeter(meter));
-                    });
-                }
-                
-                // Import settings
-                if (data.settings) {
-                    for (const [key, value] of Object.entries(data.settings)) {
-                        promises.push(saveSetting(key, value));
+                    if (!localStorage.getItem('electricity_settings')) {
+                        localStorage.setItem('electricity_settings', JSON.stringify({
+                            defaultRatePerKwh: 28.0,
+                            defaultStandingCharge: 53.0,
+                            darkMode: false,
+                            roundedValues: true
+                        }));
                     }
+                },
+                getAllReadings: async function() {
+                    try {
+                        return JSON.parse(localStorage.getItem('electricity_readings') || '[]');
+                    } catch (error) {
+                        console.error('Error getting readings:', error);
+                        return [];
+                    }
+                },
+                getMostRecentReading: async function() {
+                    try {
+                        const readings = JSON.parse(localStorage.getItem('electricity_readings') || '[]');
+                        if (readings.length === 0) return null;
+                        
+                        readings.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+                        return readings[0];
+                    } catch (error) {
+                        console.error('Error getting most recent reading:', error);
+                        return null;
+                    }
+                },
+                saveReading: async function(reading) {
+                    try {
+                        const readings = JSON.parse(localStorage.getItem('electricity_readings') || '[]');
+                        reading.id = `reading_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+                        readings.push(reading);
+                        localStorage.setItem('electricity_readings', JSON.stringify(readings));
+                        return { success: true };
+                    } catch (error) {
+                        console.error('Error saving reading:', error);
+                        return { success: false, error: error.message };
+                    }
+                },
+                getSettings: function() {
+                    return JSON.parse(localStorage.getItem('electricity_settings') || '{}');
+                },
+                saveSettings: function(settings) {
+                    localStorage.setItem('electricity_settings', JSON.stringify(settings));
+                    return true;
+                },
+                getStorageUsage: function() {
+                    const readings = localStorage.getItem('electricity_readings') || '[]';
+                    const settings = localStorage.getItem('electricity_settings') || '{}';
+                    const totalSize = (readings.length + settings.length) / 1024;
+                    const readingsCount = JSON.parse(readings).length;
+                    return {
+                        totalSize: `${totalSize.toFixed(2)} KB`,
+                        readingsCount,
+                        limit: '5MB'
+                    };
+                },
+                exportData: function() {
+                    return {
+                        readings: JSON.parse(localStorage.getItem('electricity_readings') || '[]'),
+                        settings: JSON.parse(localStorage.getItem('electricity_settings') || '{}'),
+                        timestamp: new Date().toISOString()
+                    };
+                },
+                importData: function(data) {
+                    if (data.readings) {
+                        localStorage.setItem('electricity_readings', JSON.stringify(data.readings));
+                    }
+                    if (data.settings) {
+                        localStorage.setItem('electricity_settings', JSON.stringify(data.settings));
+                    }
+                    return { success: true };
+                },
+                clearAllData: function() {
+                    const backup = {
+                        readings: JSON.parse(localStorage.getItem('electricity_readings') || '[]'),
+                        settings: JSON.parse(localStorage.getItem('electricity_settings') || '{}'),
+                        timestamp: new Date().toISOString()
+                    };
+                    localStorage.setItem('electricity_backup', JSON.stringify(backup));
+                    localStorage.setItem('electricity_readings', JSON.stringify([]));
+                    return { success: true };
                 }
-                
-                return Promise.all(promises);
-            });
-    }
-    
-    /**
-     * Calculate storage usage
-     * @returns {Promise} Resolves with storage usage in bytes
-     */
-    function getStorageUsage() {
-        if (isUsingFallback) {
-            let totalSize = 0;
-            for (const key in localStorage) {
-                if (localStorage.hasOwnProperty(key)) {
-                    totalSize += (localStorage[key].length + key.length) * 2; // UTF-16 uses 2 bytes per character
-                }
-            }
-            return Promise.resolve(totalSize);
+            };
         }
         
-        return exportData()
-            .then((data) => {
-                const jsonString = JSON.stringify(data);
-                return new Blob([jsonString]).size;
-            });
-    }
-    
-    // Return public API
-    return {
-        init,
-        saveReading,
-        getAllReadings,
-        getReadingsByDateRange,
-        getMostRecentReading,
-        deleteReading,
-        saveSetting,
-        getSetting,
-        saveMeter,
-        getAllMeters,
-        deleteMeter,
-        clearAllData,
-        exportData,
-        importData,
-        getStorageUsage,
-        isUsingFallback: () => isUsingFallback
-    };
+        // Ensure initialization is called
+        if (window.BillStorageManager && window.BillStorageManager.init) {
+            window.BillStorageManager.init();
+        }
+    });
 })();
-
-// Make BillStorageManager available globally
-window.BillStorageManager = BillStorageManager;
-
 
 // ====== CALCULATOR MODULE ======
 const BillCalculator = (function() {
@@ -1203,227 +757,355 @@ const PDFGenerator = (function() {
     function generateBillPDF(calculation, options = {}) {
         // Initialize jsPDF
         const { jsPDF } = window.jspdf;
+        // Create a new PDF in portrait mode
         const doc = new jsPDF();
         
         // PDF configuration
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 20;
-        const contentWidth = pageWidth - (margin * 2);
-        let yPos = margin;
+        let yPos = 15;
         
-        // Helper function to check if we need a new page
-        const checkPageBreak = (height) => {
-            if (yPos + height > pageHeight - margin) {
-                doc.addPage();
-                yPos = margin;
+        // ======== UTILITY FUNCTIONS ========
+        const formatCurrency = (value) => `£${parseFloat(value).toFixed(2)}`;
+        const formatNumber = (num, decimals = 1) => parseFloat(num).toFixed(decimals);
+        
+        // Add new page and reset position
+        const addNewPage = () => {
+            doc.addPage();
+            yPos = 15;
+            // Add page header and footer
+            addPageHeader();
+            addPageFooter();
+        };
+        
+        // Check if we need to add a new page
+        const checkPageBreak = (neededSpace) => {
+            if (yPos + neededSpace > pageHeight - 40) {
+                addNewPage();
                 return true;
             }
             return false;
         };
         
-        // Helper function to add a line
-        const addLine = (y) => {
-            doc.setDrawColor(200, 200, 200);
-            doc.line(margin, y, pageWidth - margin, y);
-        };
-        
-        // Helper function to format a number
-        const formatNumber = (num, decimals = 2) => {
-            return parseFloat(num).toFixed(decimals);
-        };
-        
-        // Add header
-        doc.setFontSize(22);
-        doc.setTextColor(74, 109, 167);
-        doc.text("Electricity Bill Calculation", pageWidth / 2, yPos, { align: "center" });
-        yPos += 10;
-        
-        // Add property details if provided
-        if (options.propertyName || options.propertyAddress) {
-            doc.setFontSize(12);
-            doc.setTextColor(100, 100, 100);
+        // ======== STYLE FUNCTIONS ========
+        // Function to add a page header to each page
+        const addPageHeader = () => {
+            // Add minimal header text
+            doc.setDrawColor(80, 80, 80);
+            doc.setLineWidth(0.5);
+            doc.line(margin, 12, pageWidth - margin, 12);
             
-            if (options.propertyName) {
-                doc.text(options.propertyName, pageWidth / 2, yPos, { align: "center" });
-                yPos += 6;
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text("ELECTRICITY BILL", margin, 10);
+            
+            const dateText = new Date().toLocaleDateString('en-GB', {
+                day: 'numeric', month: 'long', year: 'numeric'
+            });
+            doc.text(dateText, pageWidth - margin, 10, { align: 'right' });
+        };
+        
+        // Function to add a page footer
+        const addPageFooter = () => {
+            doc.setDrawColor(80, 80, 80);
+            doc.setLineWidth(0.5);
+            doc.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
+            
+            doc.setFontSize(8);
+            doc.setTextColor(100, 100, 100);
+            doc.text("Generated with Electricity Bill Calculator", margin, pageHeight - 12);
+            doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin, pageHeight - 12, { align: 'right' });
+        };
+        
+        // Function to create a styled section title
+        const addSectionTitle = (title, withBackground = false) => {
+            if (withBackground) {
+                doc.setFillColor(230, 230, 230);
+                doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 12, 'F');
+            } else {
+                doc.setDrawColor(150, 150, 150);
+                doc.setLineWidth(0.1);
+                doc.line(margin, yPos + 7, pageWidth - margin, yPos + 7);
             }
             
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(11);
+            doc.setTextColor(50, 50, 50);
+            doc.text(title.toUpperCase(), margin, yPos + 3);
+            yPos += 14;
+        };
+        
+        // ======== BEGIN PDF GENERATION ========
+        // Add first page header and footer
+        addPageHeader();
+        addPageFooter();
+        
+        // ======== INVOICE HEADER ========
+        // Major title
+        doc.setFontSize(24);
+        doc.setTextColor(40, 40, 40);
+        doc.setFont(undefined, 'bold');
+        doc.text("ELECTRICITY INVOICE", pageWidth / 2, yPos + 10, { align: 'center' });
+        yPos += 25;
+        
+        // Add property information
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'normal');
+        
+        // Invoice details box (right side)
+        const boxWidth = 80;
+        const boxHeight = 50;
+        const boxX = pageWidth - margin - boxWidth;
+        const boxY = yPos - 10;
+        
+        // Draw invoice details box
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2, 2);
+        
+        // Add invoice details text
+        doc.setFontSize(9);
+        doc.text("INVOICE DETAILS", boxX + 5, boxY + 8);
+        doc.setFontSize(8);
+        doc.text(`Invoice Date: ${new Date().toLocaleDateString('en-GB')}`, boxX + 5, boxY + 18);
+        doc.text(`Billing Period: ${calculation.readings.prev.date} to ${calculation.readings.curr.date}`, boxX + 5, boxY + 26);
+        doc.text(`Days: ${calculation.periodDays}`, boxX + 5, boxY + 34);
+        
+        // Property details (left side)
+        if (options.propertyName) {
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(options.propertyName, margin, yPos);
+            doc.setFont(undefined, 'normal');
+            yPos += 8;
+            
             if (options.propertyAddress) {
+                doc.setFontSize(9);
                 const addressLines = options.propertyAddress.split('\n');
                 for (const line of addressLines) {
-                    doc.text(line, pageWidth / 2, yPos, { align: "center" });
+                    doc.text(line, margin, yPos);
                     yPos += 5;
                 }
             }
-            
-            yPos += 6;
         }
         
-        // Add reading period
-        doc.setFontSize(14);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Reading Period: ${calculation.readings.prev.date} to ${calculation.readings.curr.date}`, margin, yPos);
-        yPos += 6;
-        doc.setFontSize(12);
-        doc.text(`${calculation.periodDays} days`, margin, yPos);
-        yPos += 10;
+        // Skip to after the box position
+        yPos = Math.max(yPos + 10, boxY + boxHeight + 15);
         
-        // Add horizontal line
-        addLine(yPos);
-        yPos += 8;
+        // ======== INVOICE SUMMARY ========
+        // Add a highlighted summary box
+        const summaryBoxWidth = pageWidth - (margin * 2);
+        const summaryBoxHeight = 40;
+        const summaryBoxY = yPos;
         
-        // Add meter readings
-        doc.setFontSize(16);
-        doc.setTextColor(74, 109, 167);
-        doc.text("Meter Readings", margin, yPos);
-        yPos += 10;
-        
-        // Create table for meter readings
-        doc.setFontSize(10);
-        doc.setTextColor(0, 0, 0);
-        
-        // Table headers
+        // Draw summary box with gradient-like effect
         doc.setFillColor(240, 240, 240);
-        doc.rect(margin, yPos - 5, contentWidth, 8, 'F');
-        doc.setFont(undefined, 'bold');
-        doc.text("Meter", margin + 5, yPos);
-        doc.text("Previous Reading", margin + 70, yPos);
-        doc.text("Current Reading", margin + 130, yPos);
-        doc.text("Usage (kWh)", pageWidth - margin - 30, yPos);
-        yPos += 8;
+        doc.rect(margin, summaryBoxY, summaryBoxWidth, summaryBoxHeight, 'F');
+        doc.setFillColor(230, 230, 230);
+        doc.rect(margin, summaryBoxY + 20, summaryBoxWidth, summaryBoxHeight - 20, 'F');
         
-        // Reset font
+        // Add summary text
+        doc.setFontSize(10);
+        doc.setTextColor(80, 80, 80);
+        doc.text("ELECTRICITY CONSUMPTION", margin + 10, summaryBoxY + 10);
+        
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Total Usage: ${formatNumber(calculation.usages.total)} kWh`, margin + 10, summaryBoxY + 30);
+        
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text("TOTAL DUE:", pageWidth - margin - 90, summaryBoxY + 30);
+        doc.setFontSize(16);
+        doc.text(`${formatCurrency(calculation.costs.total)}`, pageWidth - margin - 10, summaryBoxY + 30, { align: 'right' });
         doc.setFont(undefined, 'normal');
         
+        yPos = summaryBoxY + summaryBoxHeight + 20;
+        
+        // ======== METER READINGS ========
+        addSectionTitle("METER READINGS", true);
+        
+        // Table columns configuration
+        const colWidths = [50, 35, 35, 35];
+        const col1 = margin;
+        const col2 = col1 + colWidths[0] + 5;
+        const col3 = col2 + colWidths[1] + 5;
+        const col4 = col3 + colWidths[2] + 5;
+        
+        // Table header
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 10, 'F');
+        
+        doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80);
+        doc.setFont(undefined, 'bold');
+        doc.text("METER", col1, yPos);
+        doc.text("PREVIOUS", col2, yPos);
+        doc.text("CURRENT", col3, yPos);
+        doc.text("USAGE (kWh)", col4, yPos);
+        doc.setFont(undefined, 'normal');
+        yPos += 12;
+        
         // Main meter
-        doc.text("Main Meter", margin + 5, yPos);
-        doc.text(formatNumber(calculation.readings.prev.main, 1), margin + 70, yPos);
-        doc.text(formatNumber(calculation.readings.curr.main, 1), margin + 130, yPos);
-        doc.text(formatNumber(calculation.usages.main, 1), pageWidth - margin - 30, yPos);
-        yPos += 6;
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Main Meter", col1, yPos);
+        doc.text(formatNumber(calculation.readings.prev.main), col2, yPos);
+        doc.text(formatNumber(calculation.readings.curr.main), col3, yPos);
+        doc.text(formatNumber(calculation.usages.main), col4, yPos);
+        yPos += 8;
         
         // Sub meters
         for (let i = 0; i < calculation.readings.prev.sub.length; i++) {
             const label = calculation.meterLabels.subMeters[i] || `Sub Meter ${i+1}`;
-            doc.text(label, margin + 5, yPos);
-            doc.text(formatNumber(calculation.readings.prev.sub[i], 1), margin + 70, yPos);
-            doc.text(formatNumber(calculation.readings.curr.sub[i], 1), margin + 130, yPos);
-            doc.text(formatNumber(calculation.usages.subMeters[i], 1), pageWidth - margin - 30, yPos);
-            yPos += 6;
+            doc.text(label, col1, yPos);
+            doc.text(formatNumber(calculation.readings.prev.sub[i]), col2, yPos);
+            doc.text(formatNumber(calculation.readings.curr.sub[i]), col3, yPos);
+            doc.text(formatNumber(calculation.usages.subMeters[i]), col4, yPos);
+            yPos += 8;
         }
         
         // Main property (derived)
-        doc.text("Main Property (derived)", margin + 5, yPos);
-        doc.text("-", margin + 70, yPos);
-        doc.text("-", margin + 130, yPos);
-        doc.text(formatNumber(calculation.usages.property, 1), pageWidth - margin - 30, yPos);
-        yPos += 12;
+        doc.setFont(undefined, 'bold');
+        doc.text("Main Property (derived)", col1, yPos);
+        doc.text("-", col2, yPos);
+        doc.text("-", col3, yPos);
+        doc.text(formatNumber(calculation.usages.property), col4, yPos);
+        doc.setFont(undefined, 'normal');
+        yPos += 15;
         
-        // Check for page break before rates section
-        checkPageBreak(40);
+        // ======== RATES SECTION ========
+        checkPageBreak(50);
+        addSectionTitle("RATE INFORMATION", true);
         
-        // Add rates
-        doc.setFontSize(16);
-        doc.setTextColor(74, 109, 167);
-        doc.text("Rates", margin, yPos);
-        yPos += 10;
+        const rateCol1 = margin + 5;
+        const rateCol2 = margin + 100;
         
-        // Rate details
-        doc.setFontSize(10);
+        doc.setFontSize(9);
         doc.setTextColor(0, 0, 0);
-        doc.text(`Rate per kWh: ${calculation.rates.ratePerKwh} pence (£${formatNumber(calculation.rates.ratePerKwh / 100)})`, margin, yPos);
-        yPos += 6;
-        doc.text(`Standing Charge: ${calculation.rates.standingCharge} pence per day (£${formatNumber(calculation.rates.standingCharge / 100)})`, margin, yPos);
-        yPos += 6;
-        doc.text(`Total Standing Charge for period: £${formatNumber(calculation.costs.totalStandingCharge)}`, margin, yPos);
-        yPos += 6;
+        
+        // Rate per kWh
+        doc.text("Rate per kWh:", rateCol1, yPos);
+        doc.text(`${calculation.rates.ratePerKwh} pence (${formatCurrency(calculation.rates.ratePerKwh/100)} per kWh)`, rateCol2, yPos);
+        yPos += 8;
+        
+        // Standing charge
+        doc.text("Standing Charge:", rateCol1, yPos);
+        doc.text(`${calculation.rates.standingCharge} pence per day (${formatCurrency(calculation.rates.standingCharge/100)} per day)`, rateCol2, yPos);
+        yPos += 8;
+        
+        // Standing charge total
+        doc.text("Total Standing Charge:", rateCol1, yPos);
+        doc.text(`${formatCurrency(calculation.costs.totalStandingCharge)} for ${calculation.periodDays} days`, rateCol2, yPos);
+        yPos += 8;
         
         // Standing charge split method
         let splitMethod = "";
         switch (calculation.rates.standingChargeSplit) {
-            case 'equal':
-                splitMethod = "Equal split between all meters";
-                break;
-            case 'usage':
-                splitMethod = "Split based on usage proportion";
-                break;
-            case 'custom':
-                splitMethod = `Custom split (Main Property: ${calculation.rates.customSplitPercentage}%)`;
-                break;
-            default:
-                splitMethod = "Equal split";
+            case 'equal': splitMethod = "Equal split between all meters"; break;
+            case 'usage': splitMethod = "Split based on usage proportion"; break;
+            case 'custom': splitMethod = `Custom split (Main Property: ${calculation.rates.customSplitPercentage}%)`; break;
+            default: splitMethod = "Equal split";
         }
-        doc.text(`Standing Charge Split Method: ${splitMethod}`, margin, yPos);
+        
+        doc.text("Standing Charge Split:", rateCol1, yPos);
+        doc.text(splitMethod, rateCol2, yPos);
+        yPos += 15;
+        
+        // ======== COST BREAKDOWN ========
+        checkPageBreak(60);
+        addSectionTitle("COST BREAKDOWN", true);
+        
+        // Cost table header
+        const costCol1 = margin;
+        const costCol2 = margin + 65;
+        const costCol3 = margin + 100;
+        const costCol4 = margin + 140;
+        const costCol5 = pageWidth - margin - 10;
+        
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 10, 'F');
+        
+        doc.setFontSize(8);
+        doc.setTextColor(80, 80, 80);
+        doc.setFont(undefined, 'bold');
+        doc.text("METER", costCol1, yPos);
+        doc.text("USAGE (kWh)", costCol2, yPos);
+        doc.text("ENERGY (£)", costCol3, yPos);
+        doc.text("STANDING (£)", costCol4, yPos);
+        doc.text("TOTAL (£)", costCol5, yPos, { align: 'right' });
+        doc.setFont(undefined, 'normal');
         yPos += 12;
         
-        // Check for page break before costs table
-        checkPageBreak(60);
+        // Zebra striping function for rows
+        const addRowBackground = (index) => {
+            if (index % 2 === 1) {
+                doc.setFillColor(245, 245, 245);
+                doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 8, 'F');
+            }
+        };
         
-        // Add costs
-        doc.setFontSize(16);
-        doc.setTextColor(74, 109, 167);
-        doc.text("Bill Breakdown", margin, yPos);
-        yPos += 10;
-        
-        // Create table for costs
-        doc.setFontSize(10);
+        // Cost rows
+        doc.setFontSize(9);
         doc.setTextColor(0, 0, 0);
         
-        // Table headers
-        doc.setFillColor(240, 240, 240);
-        doc.rect(margin, yPos - 5, contentWidth, 8, 'F');
-        doc.setFont(undefined, 'bold');
-        doc.text("Meter", margin + 5, yPos);
-        doc.text("Usage (kWh)", margin + 70, yPos);
-        doc.text("Energy Cost (£)", margin + 115, yPos);
-        doc.text("Standing Charge (£)", margin + 160, yPos);
-        doc.text("Total (£)", pageWidth - margin - 20, yPos);
+        // Main property
+        addRowBackground(0);
+        doc.text(calculation.meterLabels.property, costCol1, yPos);
+        doc.text(formatNumber(calculation.costs.property.usage), costCol2, yPos);
+        doc.text(formatCurrency(calculation.costs.property.energyCost), costCol3, yPos);
+        doc.text(formatCurrency(calculation.costs.property.standingCharge), costCol4, yPos);
+        doc.text(formatCurrency(calculation.costs.property.total), costCol5, yPos, { align: 'right' });
         yPos += 8;
         
-        // Reset font
-        doc.setFont(undefined, 'normal');
-        
-        // Main property
-        doc.text(calculation.meterLabels.property, margin + 5, yPos);
-        doc.text(formatNumber(calculation.costs.property.usage, 1), margin + 70, yPos);
-        doc.text(formatNumber(calculation.costs.property.energyCost, 2), margin + 115, yPos);
-        doc.text(formatNumber(calculation.costs.property.standingCharge, 2), margin + 160, yPos);
-        doc.text(formatNumber(calculation.costs.property.total, 2), pageWidth - margin - 20, yPos);
-        yPos += 6;
-        
         // Sub meters
-        for (const subMeter of calculation.costs.subMeters) {
-            doc.text(subMeter.label, margin + 5, yPos);
-            doc.text(formatNumber(subMeter.usage, 1), margin + 70, yPos);
-            doc.text(formatNumber(subMeter.energyCost, 2), margin + 115, yPos);
-            doc.text(formatNumber(subMeter.standingCharge, 2), margin + 160, yPos);
-            doc.text(formatNumber(subMeter.total, 2), pageWidth - margin - 20, yPos);
-            yPos += 6;
-        }
+        calculation.costs.subMeters.forEach((subMeter, index) => {
+            addRowBackground(index + 1);
+            doc.text(subMeter.label, costCol1, yPos);
+            doc.text(formatNumber(subMeter.usage), costCol2, yPos);
+            doc.text(formatCurrency(subMeter.energyCost), costCol3, yPos);
+            doc.text(formatCurrency(subMeter.standingCharge), costCol4, yPos);
+            doc.text(formatCurrency(subMeter.total), costCol5, yPos, { align: 'right' });
+            yPos += 8;
+        });
         
         // Total row
-        doc.setDrawColor(100, 100, 100);
-        doc.line(margin, yPos - 2, pageWidth - margin, yPos - 2);
-        doc.setFont(undefined, 'bold');
-        doc.text("Total", margin + 5, yPos);
-        doc.text(formatNumber(calculation.usages.total, 1), margin + 70, yPos);
+        doc.setFillColor(220, 220, 220);
+        doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 10, 'F');
         
         // Calculate total energy cost
         const totalEnergyCost = calculation.costs.property.energyCost + 
-                              calculation.costs.subMeters.reduce((sum, meter) => sum + meter.energyCost, 0);
+                               calculation.costs.subMeters.reduce((sum, meter) => sum + meter.energyCost, 0);
         
-        doc.text(formatNumber(totalEnergyCost, 2), margin + 115, yPos);
-        doc.text(formatNumber(calculation.costs.totalStandingCharge, 2), margin + 160, yPos);
-        doc.text(formatNumber(calculation.costs.total, 2), pageWidth - margin - 20, yPos);
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(9);
+        doc.text("TOTAL", costCol1, yPos);
+        doc.text(formatNumber(calculation.usages.total), costCol2, yPos);
+        doc.text(formatCurrency(totalEnergyCost), costCol3, yPos);
+        doc.text(formatCurrency(calculation.costs.totalStandingCharge), costCol4, yPos);
+        doc.text(formatCurrency(calculation.costs.total), costCol5, yPos, { align: 'right' });
+        doc.setFont(undefined, 'normal');
+        yPos += 20;
+        
+        // ======== PAYMENT INFORMATION ========
+        checkPageBreak(40);
+        addSectionTitle("PAYMENT INFORMATION");
+        
+        doc.setFontSize(9);
+        doc.setTextColor(0, 0, 0);
+        doc.text("Please make payment within 14 days of receipt of this bill.", margin, yPos);
+        yPos += 8;
+        doc.text("For any queries regarding this bill, please contact the property manager.", margin, yPos);
         yPos += 15;
         
-        // Add footer with generation date
-        checkPageBreak(20);
+        // Add a note about calculations
         doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, pageWidth - margin, pageHeight - margin, { align: 'right' });
-        doc.text('Electricity Bill Calculator', margin, pageHeight - margin);
+        doc.setTextColor(100, 100, 100);
+        doc.text("Note: This bill was calculated based on the meter readings provided.", margin, yPos);
+        yPos += 6;
+        doc.text("All costs include VAT where applicable.", margin, yPos);
         
         return doc;
     }
@@ -1435,97 +1117,138 @@ const PDFGenerator = (function() {
      * @returns {jsPDF} The PDF document object
      */
     function generateSummaryPDF(calculation, options = {}) {
-        // Initialize jsPDF
+        // Initialize jsPDF in landscape for the summary
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
+        const doc = new jsPDF('landscape');
         
         // PDF configuration
         const pageWidth = doc.internal.pageSize.getWidth();
+        const pageHeight = doc.internal.pageSize.getHeight();
         const margin = 20;
-        let yPos = margin;
+        let yPos = 20;
         
-        // Helper function to format a number
-        const formatNumber = (num, decimals = 2) => {
-            return parseFloat(num).toFixed(decimals);
+        // Utility functions
+        const formatCurrency = (value) => `£${parseFloat(value).toFixed(2)}`;
+        const formatNumber = (num, decimals = 1) => parseFloat(num).toFixed(decimals);
+        
+        // Function to add section title
+        const addSectionTitle = (title) => {
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.line(margin, yPos, pageWidth - margin, yPos);
+            
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(12);
+            doc.setTextColor(80, 80, 80);
+            doc.text(title.toUpperCase(), margin, yPos + 10);
+            yPos += 20;
         };
         
-        // Add header
-        doc.setFontSize(22);
-        doc.setTextColor(74, 109, 167);
-        doc.text("Electricity Bill Summary", pageWidth / 2, yPos, { align: "center" });
+        // Add document title
+        doc.setFontSize(24);
+        doc.setTextColor(40, 40, 40);
+        doc.setFont(undefined, 'bold');
+        doc.text("ELECTRICITY BILL SUMMARY", pageWidth / 2, yPos, { align: 'center' });
         yPos += 15;
         
-        // Add property details if provided
+        // Add property info and period
+        doc.setFontSize(12);
+        doc.setTextColor(80, 80, 80);
+        doc.setFont(undefined, 'normal');
+        
         if (options.propertyName) {
-            doc.setFontSize(16);
-            doc.setTextColor(100, 100, 100);
-            doc.text(options.propertyName, pageWidth / 2, yPos, { align: "center" });
-            yPos += 10;
+            doc.text(options.propertyName, pageWidth / 2, yPos, { align: 'center' });
+            yPos += 8;
         }
         
-        // Add reading period
-        doc.setFontSize(14);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Period: ${calculation.readings.prev.date} to ${calculation.readings.curr.date} (${calculation.periodDays} days)`, pageWidth / 2, yPos, { align: "center" });
-        yPos += 20;
+        doc.text(`Period: ${calculation.readings.prev.date} to ${calculation.readings.curr.date} (${calculation.periodDays} days)`, 
+            pageWidth / 2, yPos, { align: 'center' });
+        yPos += 25;
         
-        // Add usage summary
+        // Create a visual summary box
+        const boxWidth = 260;
+        const boxHeight = 100;
+        const boxX = (pageWidth - boxWidth) / 2;
+        const boxY = yPos;
+        
+        // Draw outer box
+        doc.setDrawColor(200, 200, 200);
+        doc.setFillColor(250, 250, 250);
+        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 5, 5, 'FD');
+        
+        // Draw inner sections
+        doc.setFillColor(240, 240, 240);
+        doc.rect(boxX, boxY + 30, boxWidth, 30, 'F');
+        
+        // Add content to box
         doc.setFontSize(14);
-        doc.setTextColor(74, 109, 167);
-        doc.text("Usage Summary", pageWidth / 2, yPos, { align: "center" });
+        doc.setTextColor(80, 80, 80);
+        doc.setFont(undefined, 'bold');
+        doc.text("ELECTRICITY BILL", boxX + (boxWidth / 2), boxY + 15, { align: 'center' });
+        
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text("Total Usage:", boxX + 20, boxY + 50);
+        doc.text(`${formatNumber(calculation.usages.total)} kWh`, boxX + boxWidth - 20, boxY + 50, { align: 'right' });
+        
+        doc.setFontSize(16);
+        doc.setTextColor(40, 40, 40);
+        doc.setFont(undefined, 'bold');
+        doc.text("TOTAL DUE:", boxX + 20, boxY + 85);
+        doc.setFontSize(20);
+        doc.text(formatCurrency(calculation.costs.total), boxX + boxWidth - 20, boxY + 85, { align: 'right' });
+        
+        yPos = boxY + boxHeight + 30;
+        
+        // Add usage breakdown
+        addSectionTitle("USAGE BREAKDOWN");
+        
+        const colWidth = (pageWidth - (margin * 2)) / 4;
+        const usageCol1 = margin + 10;
+        const usageCol2 = margin + colWidth;
+        const usageCol3 = margin + (colWidth * 2);
+        const usageCol4 = margin + (colWidth * 3);
+        
+        // Headers
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.setFont(undefined, 'bold');
+        doc.text("METER", usageCol1, yPos);
+        doc.text("USAGE (kWh)", usageCol2, yPos);
+        doc.text("COST (£)", usageCol3, yPos);
+        doc.text("% OF TOTAL", usageCol4, yPos);
         yPos += 10;
         
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Total Usage: ${formatNumber(calculation.usages.total, 1)} kWh`, pageWidth / 2, yPos, { align: "center" });
-        yPos += 8;
-        doc.text(`Main Property: ${formatNumber(calculation.usages.property, 1)} kWh`, pageWidth / 2, yPos, { align: "center" });
+        // Main property
+        doc.setTextColor(40, 40, 40);
+        doc.setFont(undefined, 'normal');
+        doc.text(calculation.meterLabels.property, usageCol1, yPos);
+        doc.text(formatNumber(calculation.usages.property), usageCol2, yPos);
+        doc.text(formatCurrency(calculation.costs.property.total), usageCol3, yPos);
+        const propertyPercent = (calculation.costs.property.total / calculation.costs.total * 100).toFixed(1);
+        doc.text(`${propertyPercent}%`, usageCol4, yPos);
         yPos += 8;
         
         // Sub meters
-        for (let i = 0; i < calculation.usages.subMeters.length; i++) {
-            const label = calculation.meterLabels.subMeters[i] || `Sub Meter ${i+1}`;
-            doc.text(`${label}: ${formatNumber(calculation.usages.subMeters[i], 1)} kWh`, pageWidth / 2, yPos, { align: "center" });
+        calculation.costs.subMeters.forEach(subMeter => {
+            doc.text(subMeter.label, usageCol1, yPos);
+            doc.text(formatNumber(subMeter.usage), usageCol2, yPos);
+            doc.text(formatCurrency(subMeter.total), usageCol3, yPos);
+            const percent = (subMeter.total / calculation.costs.total * 100).toFixed(1);
+            doc.text(`${percent}%`, usageCol4, yPos);
             yPos += 8;
-        }
+        });
         
-        yPos += 10;
+        // Add a horizontal divider
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
         
-        // Add cost summary
-        doc.setFontSize(14);
-        doc.setTextColor(74, 109, 167);
-        doc.text("Cost Summary", pageWidth / 2, yPos, { align: "center" });
-        yPos += 10;
-        
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Rate: ${calculation.rates.ratePerKwh} pence per kWh`, pageWidth / 2, yPos, { align: "center" });
-        yPos += 8;
-        doc.text(`Standing Charge: ${calculation.rates.standingCharge} pence per day`, pageWidth / 2, yPos, { align: "center" });
-        yPos += 15;
-        
-        // Main property cost
-        doc.text(`${calculation.meterLabels.property}: £${formatNumber(calculation.costs.property.total, 2)}`, pageWidth / 2, yPos, { align: "center" });
-        yPos += 8;
-        
-        // Sub meters costs
-        for (const subMeter of calculation.costs.subMeters) {
-            doc.text(`${subMeter.label}: £${formatNumber(subMeter.total, 2)}`, pageWidth / 2, yPos, { align: "center" });
-            yPos += 8;
-        }
-        
-        yPos += 10;
-        
-        // Add total
-        doc.setFontSize(16);
-        doc.setTextColor(74, 109, 167);
-        doc.text(`Total Bill: £${formatNumber(calculation.costs.total, 2)}`, pageWidth / 2, yPos, { align: "center" });
-        
-        // Add footer with generation date
+        // Add footer
         doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        const pageHeight = doc.internal.pageSize.getHeight();
-        doc.text(`Generated on ${new Date().toLocaleDateString()}`, pageWidth / 2, pageHeight - margin, { align: 'center' });
+        doc.setTextColor(120, 120, 120);
+        doc.text("Generated with Electricity Bill Calculator", margin, pageHeight - 10);
+        doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
         
         return doc;
     }
@@ -1648,8 +1371,11 @@ const UI = (function() {
         elements.customSplitPercentage = safeGetElement('customSplitPercentage');
         elements.setTodayBtn = safeGetElement('setTodayBtn');
         elements.setPrevDateBtn = safeGetElement('setPrevDateBtn');
-        elements.loadLastReadingBtn = safeGetElement('loadLastReadingBtn');
-        elements.loadFromHistoryBtn = safeGetElement('loadFromHistoryBtn');
+        
+        // Skip removed elements but set to null to avoid errors elsewhere
+        elements.loadLastReadingBtn = null; // Removed in UI simplification
+        elements.loadFromHistoryBtn = null; // Removed in UI simplification
+        
         elements.addSubMeterBtn = safeGetElement('addSubMeterBtn');
         elements.calculateBtn = safeGetElement('calculateBtn');
         elements.generatePdfBtn = safeGetElement('generatePdfBtn');
@@ -1668,19 +1394,12 @@ const UI = (function() {
         elements.periodDays = safeGetElement('periodDays');
         elements.totalUsage = safeGetElement('totalUsage');
         
-        // History tab
-        elements.historyTab = safeGetElement('historyTab');
+        // History tab (removed - set to null)
+        elements.historyTab = null; // Removed in UI simplification
+        elements.historyTable = null; // Removed in UI simplification
+        elements.historyFilter = null; // Removed in UI simplification
+        elements.historyEmptyState = null; // Removed in UI simplification
         
-        try {
-            if (safeGetElement('historyTable')) {
-                elements.historyTable = safeGetElement('historyTable').querySelector('tbody');
-            }
-        } catch (e) {
-            console.warn('Error getting historyTable tbody:', e);
-        }
-        
-        elements.historyFilter = safeGetElement('historyFilter');
-        elements.historyEmptyState = safeGetElement('historyEmptyState');
         elements.exportDataBtn = safeGetElement('exportDataBtn');
         elements.importDataBtn = safeGetElement('importDataBtn');
         elements.importFileInput = safeGetElement('importFileInput');
@@ -1763,12 +1482,7 @@ const UI = (function() {
                     targetContent = document.getElementById('calculatorTab') || 
                         Array.from(allTabContents).find(content => content.id.includes('calculator'));
                     break;
-                case 'historyTab':
-                    targetButton = Array.from(allTabButtons).find(btn => 
-                        btn.textContent.includes('History') || btn.id.includes('History'));
-                    targetContent = document.getElementById('historyTab') || 
-                        Array.from(allTabContents).find(content => content.id.includes('history'));
-                    break;
+                // History tab removed - case removed
                 case 'settingsTab':
                     targetButton = Array.from(allTabButtons).find(btn => 
                         btn.textContent.includes('Settings') || btn.id.includes('Settings'));
@@ -1791,10 +1505,8 @@ const UI = (function() {
             // Update state
             state.currentTab = tabId;
             
-            // Handle special tab behaviors
-            if (tabId === 'historyTab' && eventHandlers.onHistoryTabSelected) {
-                eventHandlers.onHistoryTabSelected();
-            } else if (tabId === 'settingsTab' && eventHandlers.onSettingsTabSelected) {
+            // Handle special tab behaviors - history tab removed
+            if (tabId === 'settingsTab' && eventHandlers.onSettingsTabSelected) {
                 eventHandlers.onSettingsTabSelected();
             }
             
@@ -1826,12 +1538,8 @@ const UI = (function() {
         // Update state
         state.currentTab = tabId;
         
-        // Special handling for tabs
-        if (tabId === 'historyTab') {
-            if (eventHandlers.onHistoryTabSelected) {
-                eventHandlers.onHistoryTabSelected();
-            }
-        } else if (tabId === 'settingsTab') {
+        // Special handling for tabs - history tab removed
+        if (tabId === 'settingsTab') {
             if (eventHandlers.onSettingsTabSelected) {
                 eventHandlers.onSettingsTabSelected();
             }
@@ -1856,6 +1564,10 @@ const UI = (function() {
         // Calculator tab
         safeAddEventListener(elements.setTodayBtn, 'click', setTodayDate);
         safeAddEventListener(elements.setPrevDateBtn, 'click', setPreviousDate);
+        
+        // Skip events for removed buttons
+        // These elements no longer exist in the UI
+        /*
         safeAddEventListener(elements.loadLastReadingBtn, 'click', () => {
             if (eventHandlers.onLoadLastReadingClicked) {
                 eventHandlers.onLoadLastReadingClicked();
@@ -1866,6 +1578,8 @@ const UI = (function() {
                 eventHandlers.onLoadFromHistoryClicked();
             }
         });
+        */
+        
         safeAddEventListener(elements.addSubMeterBtn, 'click', addSubMeterFields);
         safeAddEventListener(elements.calculateBtn, 'click', () => {
             if (eventHandlers.onCalculateClicked) {
@@ -1886,12 +1600,16 @@ const UI = (function() {
             toggleCustomSplitVisibility();
         });
         
-        // History tab
+        // History tab - skip removed elements
+        /*
         safeAddEventListener(elements.historyFilter, 'change', () => {
             if (eventHandlers.onHistoryFilterChanged) {
                 eventHandlers.onHistoryFilterChanged(elements.historyFilter.value);
             }
         });
+        */
+        
+        // Data management buttons
         safeAddEventListener(elements.exportDataBtn, 'click', () => {
             if (eventHandlers.onExportDataClicked) {
                 eventHandlers.onExportDataClicked();
@@ -3046,18 +2764,26 @@ document.addEventListener('DOMContentLoaded', function() {
         UI.on('onCalculateClicked', handleCalculation);
         UI.on('onGeneratePdfClicked', generatePdf);
         UI.on('onSaveReadingClicked', saveReading);
-        UI.on('onLoadLastReadingClicked', loadLastReadingAsPrevious);
-        UI.on('onLoadFromHistoryClicked', showLoadFromHistoryModal);
         
-        // History tab events
+        // Skip event handlers for removed buttons
+        // UI.on('onLoadLastReadingClicked', loadLastReadingAsPrevious);
+        // UI.on('onLoadFromHistoryClicked', showLoadFromHistoryModal);
+        
+        // Skip History tab events (tab removed)
+        /*
         UI.on('onHistoryTabSelected', loadReadingHistory);
         UI.on('onHistoryFilterChanged', handleHistoryFilter);
         UI.on('onViewReadingClicked', viewReadingDetails);
         UI.on('onUseAsPreviousClicked', useAsPreviousReading);
         UI.on('onDeleteReadingConfirmed', deleteReading);
+        */
+        
+        // Data Export/Import events
         UI.on('onExportDataClicked', exportData);
         UI.on('onImportFileSelected', importData);
-        UI.on('onGeneratePdfForReading', generatePdfFromHistory);
+        
+        // Skip PDF for reading history (History tab removed)
+        // UI.on('onGeneratePdfForReading', generatePdfFromHistory);
         
         // Settings tab events
         UI.on('onSettingsTabSelected', updateStorageUsage);
@@ -3119,19 +2845,48 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Add New Reading Cycle button
                 UI.addNewReadingCycleButton();
             } else {
-                // No readings found, show first-time setup
-                setTimeout(() => {
-                    UI.showFirstTimeSetup();
-                }, 500);
+                // No readings found, but don't show first-time setup
+                console.log('No previous readings found. Skipping first-time setup popup.');
+                
+                // Set default values instead
+                const defaultSettings = {
+                    defaultRatePerKwh: 28.0,
+                    defaultStandingCharge: 53.0
+                };
+                
+                // Set default values in the form
+                UI.setFormData({
+                    prevDate: '', // Leave date empty
+                    prevMain: 0,
+                    prevSub: [0],
+                    ratePerKwh: defaultSettings.defaultRatePerKwh,
+                    standingCharge: defaultSettings.defaultStandingCharge,
+                    standingChargeSplit: 'equal',
+                    customSplitPercentage: 50,
+                    subMeterLabels: ['Coffee Shop']
+                });
             }
         } catch (error) {
             console.error('Error loading most recent reading:', error);
             UI.showAlert('Error loading previous readings.', 'warning');
             
-            // Show first-time setup as fallback
-            setTimeout(() => {
-                UI.showFirstTimeSetup();
-            }, 500);
+            // Set default values instead of showing first-time setup
+            const defaultSettings = {
+                defaultRatePerKwh: 28.0,
+                defaultStandingCharge: 53.0
+            };
+            
+            // Set default values in the form
+            UI.setFormData({
+                prevDate: '', // Leave date empty
+                prevMain: 0,
+                prevSub: [0],
+                ratePerKwh: defaultSettings.defaultRatePerKwh,
+                standingCharge: defaultSettings.defaultStandingCharge,
+                standingChargeSplit: 'equal',
+                customSplitPercentage: 50,
+                subMeterLabels: ['Coffee Shop']
+            });
         }
     }
     
@@ -3556,45 +3311,101 @@ async function initPdfFixes() {
      */
     async function importData(file) {
         try {
+            console.log('Import requested for file:', file.name);
+            
+            // Quick validation of filename
+            if (file.name.includes('package') || file.name.includes('node_modules')) {
+                UI.showAlert('This appears to be a Node.js package file, not a bill calculator backup. Please select a valid backup file.', 'danger');
+                return;
+            }
+            
             // Show confirmation modal
             UI.showConfirmationModal(
                 'Import Data',
                 'Importing data will replace all existing data. Are you sure you want to continue?',
                 async () => {
                     try {
+                        UI.showAlert('Reading file...', 'info');
+                        
                         // Read file as text
                         const fileText = await readFileAsText(file);
+                        console.log('File read successfully, length:', fileText.length);
                         
-                        // Parse JSON
-                        const data = JSON.parse(fileText);
+                        // Debug: Log the first 100 characters to see what we're working with
+                        console.log('File preview:', fileText.substring(0, 100) + '...');
                         
-                        // Import data
-                        await BillStorageManager.importData(data);
-                        
-                        // Reload settings
-                        await loadSettings();
-                        
-                        // Reload most recent reading
-                        await loadMostRecentReading();
-                        
-                        // Reload reading history if on history tab
-                        if (document.getElementById('historyTab')?.classList.contains('active')) {
-                            await loadReadingHistory();
+                        try {
+                            // Parse JSON
+                            const data = JSON.parse(fileText);
+                            console.log('JSON parsed successfully:', data);
+                            
+                            // Validate if this looks like a bill calculator backup
+                            if (data.name && data.packages && !data.readings) {
+                                console.error('This appears to be a package.json or package-lock.json file, not a bill calculator backup');
+                                UI.showAlert('Invalid backup file: This appears to be a package.json file, not a bill calculator backup.', 'danger');
+                                return;
+                            }
+                            
+                            // Check data structure before sending to storage
+                            console.log('Data has readings property:', Boolean(data.readings));
+                            if (data.readings) {
+                                console.log('Readings array length:', data.readings.length);
+                                if (data.readings.length > 0) {
+                                    console.log('First reading sample:', data.readings[0]);
+                                }
+                            }
+                            
+                            UI.showAlert('Importing data...', 'info');
+                            
+                            // Import data
+                            const result = await BillStorageManager.importData(data);
+                            console.log('Import result:', result);
+                            
+                            if (!result.success) {
+                                UI.showAlert('Import failed: ' + result.message, 'danger');
+                                return;
+                            }
+                            
+                            // Reload settings
+                            await loadSettings();
+                            
+                            // Reload most recent reading
+                            await loadMostRecentReading();
+                            
+                            // History tab has been removed
+                            /*
+                            // Reload reading history if on history tab
+                            if (document.getElementById('historyTab')?.classList.contains('active')) {
+                                await loadReadingHistory();
+                            }
+                            */
+                            
+                            // Update storage usage
+                            await updateStorageUsage();
+                            
+                            // Trigger a refresh of the previous readings dropdown
+                            const previousReadingSelect = document.getElementById('previousReadingSelect');
+                            if (previousReadingSelect) {
+                                // Create and dispatch a custom event to refresh the dropdown
+                                const refreshEvent = new CustomEvent('refresh-dropdown');
+                                previousReadingSelect.dispatchEvent(refreshEvent);
+                            }
+                            
+                            UI.showAlert('Data imported successfully.', 'success');
+                        } catch (jsonError) {
+                            console.error('JSON parsing error:', jsonError);
+                            console.log('Invalid JSON content preview:', fileText.substring(0, 200) + '...');
+                            UI.showAlert('Failed to parse JSON data: ' + jsonError.message, 'danger');
                         }
-                        
-                        // Update storage usage
-                        await updateStorageUsage();
-                        
-                        UI.showAlert('Data imported successfully.', 'success');
-                    } catch (error) {
-                        console.error('Error importing data:', error);
-                        UI.showAlert('Error importing data. Please make sure the file is valid.', 'danger');
+                    } catch (fileError) {
+                        console.error('File reading error:', fileError);
+                        UI.showAlert('Failed to read file: ' + fileError.message, 'danger');
                     }
                 }
             );
         } catch (error) {
-            console.error('Error preparing to import data:', error);
-            UI.showAlert('Error preparing to import data.', 'danger');
+            console.error('Import error:', error);
+            UI.showAlert('Import failed: ' + error.message, 'danger');
         }
     }
     
@@ -3605,14 +3416,38 @@ async function initPdfFixes() {
      */
     function readFileAsText(file) {
         return new Promise((resolve, reject) => {
+            console.log('Reading file:', file.name, 'size:', file.size, 'type:', file.type);
+            
+            if (!file) {
+                reject(new Error('No file provided'));
+                return;
+            }
+            
+            // Warn if not a JSON file
+            if (file.type !== 'application/json' && !file.name.endsWith('.json')) {
+                console.warn('Warning: File may not be JSON:', file.type || 'unknown type');
+            }
+            
             const reader = new FileReader();
             
             reader.onload = (event) => {
-                resolve(event.target.result);
+                const result = event.target.result;
+                console.log('File read complete, result size:', result.length);
+                
+                // Check if result starts with expected JSON chars
+                if (result.length > 0) {
+                    const firstChar = result.trim()[0];
+                    if (firstChar !== '{' && firstChar !== '[') {
+                        console.warn('Warning: File content does not appear to be JSON. First character:', firstChar);
+                    }
+                }
+                
+                resolve(result);
             };
             
             reader.onerror = (error) => {
-                reject(error);
+                console.error('Error reading file:', error);
+                reject(new Error('Failed to read file: ' + (error.message || 'Unknown error')));
             };
             
             reader.readAsText(file);
@@ -3855,10 +3690,13 @@ async function initPdfFixes() {
             if (resultsCard) resultsCard.classList.add('hidden');
             currentCalculation = null;
             
+            // History tab has been removed
+            /*
             // Reload reading history if on history tab
             if (document.getElementById('historyTab')?.classList.contains('active')) {
                 await loadReadingHistory();
             }
+            */
             
             // Update storage usage
             await updateStorageUsage();
@@ -3980,7 +3818,8 @@ function handleNewReadingCycle() {
                 const mostRecentReading = await BillStorageManager.getMostRecentReading();
                 
                 if (!mostRecentReading) {
-                    UI.showAlert('No previous readings found.', 'warning');
+                    // No popup when no readings found
+                    console.log('No previous readings found.');
                     return;
                 }
                 
@@ -4091,7 +3930,8 @@ function handleNewReadingCycle() {
                 // Sync the number of sub-meter fields for current and previous readings
                 syncSubMeterFieldsManually();
             } else {
-                UI.showAlert('No previous readings found', 'warning');
+                // No popup when no readings found
+                console.log('No previous readings found');
             }
         } catch (error) {
             console.error('Error loading last reading:', error);
