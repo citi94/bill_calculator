@@ -556,3 +556,30 @@ button:disabled {
     overflow-y: auto;
     margin-bottom: 15px;
 }
+
+/* Date input styling */
+.date-input {
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 0.5rem;
+    font-size: 1rem;
+    width: 100%;
+    background-color: #fff;
+    transition: border-color 0.2s ease;
+}
+
+.date-input:focus {
+    border-color: var(--primary-color);
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(74, 109, 167, 0.2);
+}
+
+.dark-theme .date-input {
+    background-color: #333;
+    color: #fff;
+    border-color: #555;
+}
+
+.dark-theme .date-input:focus {
+    border-color: var(--primary-color);
+}

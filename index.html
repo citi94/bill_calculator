@@ -42,8 +42,8 @@
                     <h2 class="card-title">Previous Readings</h2>
                     <div class="form-group">
                         <label for="prevDate">Date:</label>
-                        <input type="text" id="prevDate" placeholder="DD-MM-YYYY" pattern="\d{2}-\d{2}-\d{4}">
-                        <button id="setPrevDateBtn" class="icon-button" title="Set date">
+                        <input type="date" id="prevDate" class="date-input">
+                        <button id="setPrevDateBtn" class="icon-button" title="Open calendar">
                             <i class="fas fa-calendar-day"></i>
                         </button>
                     </div>
@@ -71,7 +71,7 @@
                     <h2 class="card-title">Current Readings</h2>
                     <div class="form-group">
                         <label for="currDate">Date:</label>
-                        <input type="text" id="currDate" placeholder="DD-MM-YYYY" pattern="\d{2}-\d{2}-\d{4}">
+                        <input type="date" id="currDate" class="date-input">
                         <button id="setTodayBtn" class="icon-button" title="Set to today">
                             <i class="fas fa-calendar-day"></i>
                         </button>
@@ -293,13 +293,16 @@
         window.setPreviousDate = function() {
             console.log("Global setPreviousDate called");
             const today = new Date();
-            const day = String(today.getDate()).padStart(2, '0');
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const year = today.getFullYear();
+            // Format date as YYYY-MM-DD for the date input
+            const formattedDate = today.toISOString().split('T')[0];
             
             const prevDateInput = document.getElementById('prevDate');
             if (prevDateInput) {
-                prevDateInput.value = `${day}-${month}-${year}`;
+                prevDateInput.value = formattedDate;
+                // Focus and open the calendar
+                prevDateInput.focus();
+                // Simulate a click to open the native date picker
+                prevDateInput.click();
             }
         };
         
@@ -386,13 +389,14 @@
                         e.preventDefault();
                         console.log("setPrevDateBtn clicked");
                         const today = new Date();
-                        const day = String(today.getDate()).padStart(2, '0');
-                        const month = String(today.getMonth() + 1).padStart(2, '0');
-                        const year = today.getFullYear();
+                        const formattedDate = today.toISOString().split('T')[0];
                         
                         const prevDateInput = document.getElementById('prevDate');
                         if (prevDateInput) {
-                            prevDateInput.value = `${day}-${month}-${year}`;
+                            prevDateInput.value = formattedDate;
+                            // Focus and open the calendar
+                            prevDateInput.focus();
+                            prevDateInput.click();
                         }
                     }, true);
                 }
@@ -495,8 +499,15 @@
             // Previous date button
             document.getElementById('setPrevDateBtn')?.addEventListener('click', function() {
                 console.log("setPrevDateBtn clicked (window.onload handler)");
-                if (window.setPreviousDate) {
-                    window.setPreviousDate();
+                const today = new Date();
+                const formattedDate = today.toISOString().split('T')[0];
+                
+                const prevDateInput = document.getElementById('prevDate');
+                if (prevDateInput) {
+                    prevDateInput.value = formattedDate;
+                    // Focus and open the calendar
+                    prevDateInput.focus();
+                    prevDateInput.click();
                 }
             });
             
