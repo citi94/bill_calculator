@@ -1700,13 +1700,15 @@ const UI = (function() {
         elements.alertBox = safeGetElement('alertBox');
         elements.modalOverlay = safeGetElement('modalOverlay');
         elements.modalContent = safeGetElement('modalContent');
+        elements.modalHeader = safeGetElement('modalHeader');
         elements.modalTitle = safeGetElement('modalTitle');
         elements.modalBody = safeGetElement('modalBody');
+        elements.modalFooter = safeGetElement('modalFooter');
         elements.modalCloseBtn = safeGetElement('modalCloseBtn');
         elements.modalCancelBtn = safeGetElement('modalCancelBtn');
         elements.modalConfirmBtn = safeGetElement('modalConfirmBtn');
         
-        // Other
+        // Privacy link
         elements.privacyLink = safeGetElement('privacyLink');
         
         console.log('DOM elements cached');
@@ -4256,7 +4258,6 @@ function handleNewReadingCycle() {
 
     /**
      * Attaches event listeners to DOM elements
-     * @returns {void}
      */
     function attachEventListeners() {
         // ... [rest of the original code remains unchanged]
@@ -4300,6 +4301,20 @@ function handleNewReadingCycle() {
                     <input type="number" id="prevSubMeter_${i}" step="0.01" min="0">
                 `;
                 prevSubMetersContainer.appendChild(fieldContainer);
+            }
+        }
+    }
+    
+    /**
+     * Close modal - wrapper for UI.closeModal
+     */
+    function closeModal() {
+        if (UI && typeof UI.closeModal === 'function') {
+            UI.closeModal();
+        } else {
+            const modalOverlay = document.getElementById('modalOverlay');
+            if (modalOverlay) {
+                modalOverlay.classList.add('hidden');
             }
         }
     }

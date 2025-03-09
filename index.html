@@ -287,6 +287,83 @@
     <!-- JavaScript -->
     <script src="js/app-combined.js"></script>
     
+    <!-- Button Fix Script -->
+    <script>
+        // Make sure UI has the necessary modal functions
+        if (window.UI) {
+            // Fix showCustomModal if missing
+            if (!UI.showCustomModal) {
+                UI.showCustomModal = function(title, bodyHTML, onConfirm, hideFooter) {
+                    const modalTitle = document.getElementById('modalTitle');
+                    const modalBody = document.getElementById('modalBody');
+                    const modalFooter = document.getElementById('modalFooter');
+                    const modalOverlay = document.getElementById('modalOverlay');
+                    
+                    if (modalTitle) modalTitle.textContent = title;
+                    if (modalBody) modalBody.innerHTML = bodyHTML;
+                    
+                    if (hideFooter && modalFooter) {
+                        modalFooter.style.display = 'none';
+                    } else if (modalFooter) {
+                        modalFooter.style.display = 'flex';
+                        
+                        const confirmBtn = document.getElementById('modalConfirmBtn');
+                        if (confirmBtn && onConfirm) {
+                            // Remove existing listeners by cloning
+                            const newConfirmBtn = confirmBtn.cloneNode(true);
+                            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+                            
+                            // Add new listener
+                            newConfirmBtn.addEventListener('click', () => {
+                                onConfirm();
+                                UI.closeModal();
+                            });
+                        }
+                    }
+                    
+                    if (modalOverlay) modalOverlay.classList.remove('hidden');
+                };
+            }
+            
+            // Fix closeModal if missing
+            if (!UI.closeModal) {
+                UI.closeModal = function() {
+                    const modalOverlay = document.getElementById('modalOverlay');
+                    if (modalOverlay) {
+                        modalOverlay.classList.add('hidden');
+                    }
+                };
+            }
+            
+            // Setup previous date button if not working
+            document.getElementById('setPrevDateBtn')?.addEventListener('click', function() {
+                const today = new Date();
+                const day = String(today.getDate()).padStart(2, '0');
+                const month = String(today.getMonth() + 1).padStart(2, '0');
+                const year = today.getFullYear();
+                
+                const prevDateInput = document.getElementById('prevDate');
+                if (prevDateInput) {
+                    prevDateInput.value = `${day}-${month}-${year}`;
+                }
+            });
+            
+            // Setup load last reading button if not working
+            document.getElementById('loadLastReadingBtn')?.addEventListener('click', function() {
+                if (typeof loadLastReadingAsPrevious === 'function') {
+                    loadLastReadingAsPrevious();
+                }
+            });
+            
+            // Setup load from history button if not working
+            document.getElementById('loadFromHistoryBtn')?.addEventListener('click', function() {
+                if (typeof showLoadFromHistoryModal === 'function') {
+                    showLoadFromHistoryModal();
+                }
+            });
+        }
+    </script>
+    
     <!-- Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {
