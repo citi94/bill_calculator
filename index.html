@@ -287,81 +287,191 @@
     <!-- JavaScript -->
     <script src="js/app-combined.js"></script>
     
+    <!-- Global Function Fix -->
+    <script>
+        // Make functions globally available
+        window.setPreviousDate = function() {
+            console.log("Global setPreviousDate called");
+            const today = new Date();
+            const day = String(today.getDate()).padStart(2, '0');
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const year = today.getFullYear();
+            
+            const prevDateInput = document.getElementById('prevDate');
+            if (prevDateInput) {
+                prevDateInput.value = `${day}-${month}-${year}`;
+            }
+        };
+        
+        // Define global closeModal function
+        window.closeModal = function() {
+            console.log("Global closeModal called");
+            const modalOverlay = document.getElementById('modalOverlay');
+            if (modalOverlay) {
+                modalOverlay.classList.add('hidden');
+            }
+        };
+    </script>
+    
     <!-- Button Fix Script -->
     <script>
-        // Make sure UI has the necessary modal functions
-        if (window.UI) {
-            // Fix showCustomModal if missing
-            if (!UI.showCustomModal) {
-                UI.showCustomModal = function(title, bodyHTML, onConfirm, hideFooter) {
-                    const modalTitle = document.getElementById('modalTitle');
-                    const modalBody = document.getElementById('modalBody');
-                    const modalFooter = document.getElementById('modalFooter');
-                    const modalOverlay = document.getElementById('modalOverlay');
-                    
-                    if (modalTitle) modalTitle.textContent = title;
-                    if (modalBody) modalBody.innerHTML = bodyHTML;
-                    
-                    if (hideFooter && modalFooter) {
-                        modalFooter.style.display = 'none';
-                    } else if (modalFooter) {
-                        modalFooter.style.display = 'flex';
-                        
-                        const confirmBtn = document.getElementById('modalConfirmBtn');
-                        if (confirmBtn && onConfirm) {
-                            // Remove existing listeners by cloning
-                            const newConfirmBtn = confirmBtn.cloneNode(true);
-                            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
-                            
-                            // Add new listener
-                            newConfirmBtn.addEventListener('click', () => {
-                                onConfirm();
-                                UI.closeModal();
-                            });
-                        }
-                    }
-                    
-                    if (modalOverlay) modalOverlay.classList.remove('hidden');
-                };
-            }
+        (function() {
+            console.log("Running button fix script...");
             
-            // Fix closeModal if missing
-            if (!UI.closeModal) {
-                UI.closeModal = function() {
+            // Define UI functions if UI exists but functions are missing
+            if (window.UI) {
+                // Fix showCustomModal if missing
+                if (!UI.showCustomModal) {
+                    console.log("Adding showCustomModal to UI");
+                    UI.showCustomModal = function(title, bodyHTML, onConfirm, hideFooter) {
+                        console.log("showCustomModal called with title:", title);
+                        const modalTitle = document.getElementById('modalTitle');
+                        const modalBody = document.getElementById('modalBody');
+                        const modalFooter = document.getElementById('modalFooter');
+                        const modalOverlay = document.getElementById('modalOverlay');
+                        
+                        if (modalTitle) modalTitle.textContent = title;
+                        if (modalBody) modalBody.innerHTML = bodyHTML;
+                        
+                        if (hideFooter && modalFooter) {
+                            modalFooter.style.display = 'none';
+                        } else if (modalFooter) {
+                            modalFooter.style.display = 'flex';
+                            
+                            const confirmBtn = document.getElementById('modalConfirmBtn');
+                            if (confirmBtn && onConfirm) {
+                                // Remove existing listeners by cloning
+                                const newConfirmBtn = confirmBtn.cloneNode(true);
+                                confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+                                
+                                // Add new listener
+                                newConfirmBtn.addEventListener('click', () => {
+                                    onConfirm();
+                                    closeModalFunction();
+                                });
+                            }
+                        }
+                        
+                        if (modalOverlay) modalOverlay.classList.remove('hidden');
+                    };
+                }
+                
+                // Define a standalone closeModal function
+                const closeModalFunction = function() {
+                    console.log("closeModal called");
                     const modalOverlay = document.getElementById('modalOverlay');
                     if (modalOverlay) {
                         modalOverlay.classList.add('hidden');
                     }
                 };
+                
+                // Fix closeModal if missing
+                if (!UI.closeModal) {
+                    console.log("Adding closeModal to UI");
+                    UI.closeModal = closeModalFunction;
+                }
+            } else {
+                console.warn("UI object not found. Fix script cannot add missing methods.");
             }
             
-            // Setup previous date button if not working
-            document.getElementById('setPrevDateBtn')?.addEventListener('click', function() {
-                const today = new Date();
-                const day = String(today.getDate()).padStart(2, '0');
-                const month = String(today.getMonth() + 1).padStart(2, '0');
-                const year = today.getFullYear();
+            // Direct add event listeners to all buttons regardless of UI
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log("Adding direct event listeners to buttons");
                 
-                const prevDateInput = document.getElementById('prevDate');
-                if (prevDateInput) {
-                    prevDateInput.value = `${day}-${month}-${year}`;
+                // Previous date button
+                const setPrevDateBtn = document.getElementById('setPrevDateBtn');
+                if (setPrevDateBtn) {
+                    console.log("Adding click handler to setPrevDateBtn");
+                    setPrevDateBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        console.log("setPrevDateBtn clicked");
+                        const today = new Date();
+                        const day = String(today.getDate()).padStart(2, '0');
+                        const month = String(today.getMonth() + 1).padStart(2, '0');
+                        const year = today.getFullYear();
+                        
+                        const prevDateInput = document.getElementById('prevDate');
+                        if (prevDateInput) {
+                            prevDateInput.value = `${day}-${month}-${year}`;
+                        }
+                    }, true);
+                }
+                
+                // Load Last Reading button
+                const loadLastReadingBtn = document.getElementById('loadLastReadingBtn');
+                if (loadLastReadingBtn) {
+                    console.log("Adding click handler to loadLastReadingBtn");
+                    loadLastReadingBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        console.log("loadLastReadingBtn clicked");
+                        
+                        // Access the function from window scope if available
+                        if (window.loadLastReadingAsPrevious) {
+                            window.loadLastReadingAsPrevious();
+                        } else if (window.BillStorageManager && window.BillStorageManager.getMostRecentReading) {
+                            // Manual implementation if function not available
+                            BillStorageManager.getMostRecentReading().then(function(mostRecentReading) {
+                                if (mostRecentReading) {
+                                    const date = new Date(mostRecentReading.currentDate);
+                                    const day = String(date.getDate()).padStart(2, '0');
+                                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                                    const year = date.getFullYear();
+                                    
+                                    const prevDateEl = document.getElementById('prevDate');
+                                    const prevMainMeterEl = document.getElementById('prevMainMeter');
+                                    const prevSubMetersContainer = document.getElementById('prevSubMetersContainer');
+                                    
+                                    if (prevDateEl) prevDateEl.value = `${day}-${month}-${year}`;
+                                    if (prevMainMeterEl) prevMainMeterEl.value = mostRecentReading.currentMainReading;
+                                    
+                                    if (prevSubMetersContainer && mostRecentReading.currentSubReadings) {
+                                        prevSubMetersContainer.innerHTML = '';
+                                        mostRecentReading.currentSubReadings.forEach((reading, index) => {
+                                            const subMeterField = document.createElement('div');
+                                            subMeterField.className = 'form-group';
+                                            subMeterField.innerHTML = `
+                                                <label for="prevSubMeter_${index}">Sub Meter (kWh):</label>
+                                                <input type="number" id="prevSubMeter_${index}" step="0.01" min="0" value="${reading}">
+                                            `;
+                                            prevSubMetersContainer.appendChild(subMeterField);
+                                        });
+                                    }
+                                    
+                                    // Show success message
+                                    const alertBox = document.getElementById('alertBox');
+                                    if (alertBox) {
+                                        alertBox.className = 'alert alert-success';
+                                        alertBox.textContent = 'Last reading loaded as previous reading';
+                                        alertBox.classList.remove('hidden');
+                                        setTimeout(() => alertBox.classList.add('hidden'), 5000);
+                                    }
+                                }
+                            }).catch(function(error) {
+                                console.error('Error loading last reading:', error);
+                            });
+                        }
+                    }, true);
+                }
+                
+                // Load from History button
+                const loadFromHistoryBtn = document.getElementById('loadFromHistoryBtn');
+                if (loadFromHistoryBtn) {
+                    console.log("Adding click handler to loadFromHistoryBtn");
+                    loadFromHistoryBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        console.log("loadFromHistoryBtn clicked");
+                        
+                        if (window.showLoadFromHistoryModal) {
+                            window.showLoadFromHistoryModal();
+                        } else if (window.UI && UI.showAlert) {
+                            UI.showAlert('History loading functionality not available', 'warning');
+                        } else {
+                            alert('History loading functionality not available');
+                        }
+                    }, true);
                 }
             });
-            
-            // Setup load last reading button if not working
-            document.getElementById('loadLastReadingBtn')?.addEventListener('click', function() {
-                if (typeof loadLastReadingAsPrevious === 'function') {
-                    loadLastReadingAsPrevious();
-                }
-            });
-            
-            // Setup load from history button if not working
-            document.getElementById('loadFromHistoryBtn')?.addEventListener('click', function() {
-                if (typeof showLoadFromHistoryModal === 'function') {
-                    showLoadFromHistoryModal();
-                }
-            });
-        }
+        })();
     </script>
     
     <!-- Service Worker Registration -->
@@ -377,6 +487,39 @@
                     });
             });
         }
+        
+        // Direct button bindings on window load, after everything else has loaded
+        window.addEventListener('load', function() {
+            console.log("Window loaded, attaching direct button handlers");
+            
+            // Previous date button
+            document.getElementById('setPrevDateBtn')?.addEventListener('click', function() {
+                console.log("setPrevDateBtn clicked (window.onload handler)");
+                if (window.setPreviousDate) {
+                    window.setPreviousDate();
+                }
+            });
+            
+            // Add event listeners directly to the modal close button
+            document.getElementById('modalCloseBtn')?.addEventListener('click', function() {
+                console.log("modalCloseBtn clicked (window.onload handler)");
+                if (window.closeModal) {
+                    window.closeModal();
+                } else {
+                    document.getElementById('modalOverlay')?.classList.add('hidden');
+                }
+            });
+            
+            // Add event listeners directly to the modal cancel button
+            document.getElementById('modalCancelBtn')?.addEventListener('click', function() {
+                console.log("modalCancelBtn clicked (window.onload handler)");
+                if (window.closeModal) {
+                    window.closeModal();
+                } else {
+                    document.getElementById('modalOverlay')?.classList.add('hidden');
+                }
+            });
+        });
     </script>
 <script src="js/diagnostic.js"></script>
 <script src="js/dom-inspector.js"></script>

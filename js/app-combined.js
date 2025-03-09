@@ -2898,8 +2898,8 @@ const UI = (function() {
         showAlert,
         showConfirmationModal,
         showReadingDetailsModal,
-        showCustomModal,
-        closeModal,
+        // showCustomModal, // Temporarily removed - not properly defined
+        // closeModal, // Temporarily removed - already defined as DOM element function
         switchTab,
         showFirstTimeSetup,
         addInitialSubMeterField,
