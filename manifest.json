@@ -1,15 +1,52 @@
 {
     "name": "Electricity Bill Calculator",
-    "short_name": "Elec Bill Calc",
+    "short_name": "Bill Calc",
     "description": "Calculate shared electricity costs between main and sub meters",
     "start_url": "/index.html",
     "display": "standalone",
-    "background_color": "#f5f7fa",
+    "orientation": "portrait",
+    "background_color": "#ffffff",
     "theme_color": "#4a6da7",
     "icons": [
       {
+        "src": "assets/icons/icon-72x72.png",
+        "sizes": "72x72",
+        "type": "image/png",
+        "purpose": "any maskable"
+      },
+      {
+        "src": "assets/icons/icon-96x96.png",
+        "sizes": "96x96",
+        "type": "image/png",
+        "purpose": "any maskable"
+      },
+      {
+        "src": "assets/icons/icon-128x128.png",
+        "sizes": "128x128",
+        "type": "image/png",
+        "purpose": "any maskable"
+      },
+      {
+        "src": "assets/icons/icon-144x144.png",
+        "sizes": "144x144",
+        "type": "image/png",
+        "purpose": "any maskable"
+      },
+      {
+        "src": "assets/icons/icon-152x152.png",
+        "sizes": "152x152",
+        "type": "image/png",
+        "purpose": "any maskable"
+      },
+      {
         "src": "assets/icons/icon-192x192.png",
         "sizes": "192x192",
+        "type": "image/png",
+        "purpose": "any maskable"
+      },
+      {
+        "src": "assets/icons/icon-384x384.png",
+        "sizes": "384x384",
         "type": "image/png",
         "purpose": "any maskable"
       },
@@ -20,7 +57,22 @@
         "purpose": "any maskable"
       }
     ],
-    "orientation": "portrait-primary",
+    "shortcuts": [
+      {
+        "name": "New Reading",
+        "short_name": "New Reading",
+        "description": "Start a new meter reading",
+        "url": "/index.html?action=new",
+        "icons": [{ "src": "assets/icons/new-reading.png", "sizes": "192x192" }]
+      },
+      {
+        "name": "Settings",
+        "short_name": "Settings",
+        "description": "Open settings",
+        "url": "/index.html?tab=settings",
+        "icons": [{ "src": "assets/icons/settings.png", "sizes": "192x192" }]
+      }
+    ],
     "categories": ["utilities", "productivity"],
     "screenshots": [
       {

@@ -2283,8 +2283,6 @@ const UI = (function() {
                     <li>Font Awesome - For icons</li>
                 </ul>
                 
-                <h4>Contact</h4>
-                <p>If you have any questions about this privacy policy, please email [contact@example.com].</p>
             </div>
         `;
         
@@ -4061,3 +4059,303 @@ function handleNewReadingCycle() {
         }
     }
 });
+
+// Ensure the dark mode toggle stays in sync with system preferences
+function syncDarkModeWithSystem() {
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const currentSetting = document.body.classList.contains('dark-theme');
+    
+    if (systemPrefersDark !== currentSetting) {
+        // Only update if the user hasn't explicitly set a preference
+        const userPreference = BillStorageManager.getSetting('userSetDarkMode', false);
+        if (!userPreference) {
+            document.body.classList.toggle('dark-theme', systemPrefersDark);
+            // Update UI toggle
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            if (darkModeToggle) {
+                darkModeToggle.checked = systemPrefersDark;
+            }
+        }
+    }
+}
+
+// For numeric inputs, check ranges and provide immediate feedback
+document.querySelectorAll('input[type="number"]').forEach(input => {
+    input.addEventListener('input', function() {
+        const value = parseFloat(this.value);
+        const min = parseFloat(this.getAttribute('min') || '-Infinity');
+        const max = parseFloat(this.getAttribute('max') || 'Infinity');
+        
+        if (isNaN(value) || value < min || value > max) {
+            this.classList.add('invalid-input');
+            const feedbackId = `${this.id}-feedback`;
+            let feedback = document.getElementById(feedbackId);
+            if (!feedback) {
+                feedback = document.createElement('small');
+                feedback.id = feedbackId;
+                feedback.className = 'validation-feedback';
+                this.parentNode.insertBefore(feedback, this.nextSibling);
+            }
+            feedback.textContent = `Please enter a value between ${min} and ${max}.`;
+        } else {
+            this.classList.remove('invalid-input');
+            const feedbackId = `${this.id}-feedback`;
+            const feedback = document.getElementById(feedbackId);
+            if (feedback) feedback.remove();
+        }
+    });
+});
+
+// Create a helper function to ensure an event listener is only attached once
+function addEventListenerOnce(element, event, handler) {
+    if (!element) return;
+    
+    // Remove any existing listeners (optional but safer)
+    element.removeEventListener(event, handler);
+    
+    // Add the new listener
+    element.addEventListener(event, handler);
+}
+
+// A unified date utility
+window.DateUtil = {
+    parse: function(dateStr) {
+        // Handle all date formats in one place
+    },
+    format: function(date, format = 'DD-MM-YYYY') {
+        // Format dates consistently
+    },
+    isValid: function(dateStr) {
+        // Validate date strings
+    }
+};
+
+// Example for localStorage
+function safeGetFromStorage(key, defaultValue = null) {
+    try {
+        const value = localStorage.getItem(key);
+        return value ? JSON.parse(value) : defaultValue;
+    } catch (error) {
+        console.error(`Error reading ${key} from localStorage:`, error);
+        return defaultValue;
+    }
+}
+
+// Add to your main JS
+let deferredPrompt;
+const installButton = document.createElement('button');
+installButton.style.display = 'none';
+installButton.className = 'install-button';
+installButton.textContent = 'Add to Home Screen';
+
+// Check if the app can be installed
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Prevent Chrome 67+ from automatically showing the prompt
+  e.preventDefault();
+  // Stash the event so it can be triggered later
+  deferredPrompt = e;
+  
+  // Show the install button if it exists
+  installButton.style.display = 'block';
+  
+  // Add the button to the UI if needed
+  const navElement = document.querySelector('.tab-navigation');
+  if (navElement && !document.querySelector('.install-button')) {
+    navElement.appendChild(installButton);
+  }
+});
+
+// Handle the install button click
+installButton.addEventListener('click', () => {
+  // Hide the install button
+  installButton.style.display = 'none';
+  
+  // Show the installation prompt
+  deferredPrompt.prompt();
+  
+  // Wait for the user to respond to the prompt
+  deferredPrompt.userChoice.then((choiceResult) => {
+    if (choiceResult.outcome === 'accepted') {
+      console.log('User accepted the install prompt');
+    } else {
+      console.log('User dismissed the install prompt');
+    }
+    // Clear the saved prompt
+    deferredPrompt = null;
+  });
+});
+
+// Add to your main JS
+const OfflineStorage = {
+  // Check if storage is available
+  isAvailable: function() {
+    try {
+      const testKey = '__storage_test__';
+      localStorage.setItem(testKey, testKey);
+      localStorage.removeItem(testKey);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+  
+  // Queue operations for when the app is online
+  queueOperation: function(operation) {
+    try {
+      const queue = JSON.parse(localStorage.getItem('offline_operations') || '[]');
+      queue.push(operation);
+      localStorage.setItem('offline_operations', JSON.stringify(queue));
+      
+      // Register for background sync if supported
+      if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.sync.register('sync-readings');
+        });
+      }
+      
+      return true;
+    } catch (e) {
+      console.error('Error queueing operation:', e);
+      return false;
+    }
+  },
+  
+  // Process the queue when online
+  processQueue: async function() {
+    try {
+      const queue = JSON.parse(localStorage.getItem('offline_operations') || '[]');
+      if (queue.length === 0) return;
+      
+      console.log(`Processing ${queue.length} queued operations`);
+      
+      // Process operations
+      for (const operation of queue) {
+        // Apply the operation
+        await this.applyOperation(operation);
+      }
+      
+      // Clear the queue
+      localStorage.removeItem('offline_operations');
+    } catch (e) {
+      console.error('Error processing queue:', e);
+    }
+  },
+  
+  // Apply a single operation
+  applyOperation: async function(operation) {
+    // These operations would be synced with a server in a real app
+    // For this offline app, we're just ensuring they're in localStorage
+    
+    switch(operation.type) {
+      case 'saveReading':
+        // Get current readings
+        const readings = JSON.parse(localStorage.getItem('electricity_readings') || '[]');
+        
+        // Add the new reading if it doesn't exist
+        if (!readings.find(r => r.id === operation.data.id)) {
+          readings.push(operation.data);
+          localStorage.setItem('electricity_readings', JSON.stringify(readings));
+        }
+        break;
+        
+      case 'saveSetting':
+        const settings = JSON.parse(localStorage.getItem('electricity_settings') || '{}');
+        settings[operation.key] = operation.value;
+        localStorage.setItem('electricity_settings', JSON.stringify(settings));
+        break;
+    }
+  }
+};
+
+// Check connection status
+function updateOnlineStatus() {
+  const isOnline = navigator.onLine;
+  document.body.classList.toggle('offline', !isOnline);
+  
+  if (isOnline) {
+    // Process queued operations when we come back online
+    OfflineStorage.processQueue();
+  }
+}
+
+// Listen for online/offline events
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+// Check status on load
+document.addEventListener('DOMContentLoaded', updateOnlineStatus);
+
+// Add to your main JS
+function setupSwipeGestures() {
+  const content = document.querySelector('main');
+  let touchstartX = 0;
+  let touchendX = 0;
+  
+  // Only set up gestures if we're not on desktop
+  if (window.matchMedia('(max-width: 768px)').matches) {
+    content.addEventListener('touchstart', e => {
+      touchstartX = e.changedTouches[0].screenX;
+    });
+    
+    content.addEventListener('touchend', e => {
+      touchendX = e.changedTouches[0].screenX;
+      handleSwipeGesture();
+    });
+  }
+  
+  function handleSwipeGesture() {
+    const threshold = 75; // Minimum swipe distance
+    
+    // If we have tabs for navigation
+    const tabButtons = document.querySelectorAll('.tab-button');
+    if (tabButtons.length > 1) {
+      if (touchendX < touchstartX - threshold) {
+        // Swipe left - go to next tab
+        const activeIdx = Array.from(tabButtons).findIndex(btn => btn.classList.contains('active'));
+        const nextIdx = (activeIdx + 1) % tabButtons.length;
+        if (nextIdx !== activeIdx) {
+          tabButtons[nextIdx].click();
+        }
+      }
+      
+      if (touchendX > touchstartX + threshold) {
+        // Swipe right - go to previous tab
+        const activeIdx = Array.from(tabButtons).findIndex(btn => btn.classList.contains('active'));
+        const prevIdx = (activeIdx - 1 + tabButtons.length) % tabButtons.length;
+        if (prevIdx !== activeIdx) {
+          tabButtons[prevIdx].click();
+        }
+      }
+    }
+  }
+}
+
+// Set up gestures on page load
+document.addEventListener('DOMContentLoaded', setupSwipeGestures);
+
+// Add to your main JS
+function vibrateOnClick() {
+  // Add vibration feedback to buttons
+  document.querySelectorAll('button, .card').forEach(element => {
+    element.addEventListener('click', () => {
+      // Check if vibration is supported
+      if (navigator.vibrate) {
+        navigator.vibrate(10); // Short vibration
+      }
+    });
+  });
+}
+
+// Set up vibration on page load
+document.addEventListener('DOMContentLoaded', vibrateOnClick);
+
+// Add to your main JS
+function enableFastClick() {
+  // Create a FastClick instance on the body
+  if ('ontouchstart' in window) {
+    // Add our own fast-click handling
+    document.addEventListener('touchstart', function() {}, false);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', enableFastClick);

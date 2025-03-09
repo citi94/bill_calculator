@@ -68,6 +68,7 @@
 html {
     font-size: 16px;
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -84,6 +85,8 @@ body {
     max-width: 1200px;
     margin: 0 auto;
     padding: var(--spacing-md);
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 /* Typography */
@@ -202,6 +205,10 @@ footer {
 
 .tab-content {
     display: none;
+    -webkit-overflow-scrolling: touch;
+    overflow-y: scroll;
+    /* Prevent overscroll bounce effect on iOS */
+    overscroll-behavior: contain;
 }
 
 .tab-content.active {
@@ -232,6 +239,8 @@ textarea {
     color: var(--text-color);
     background-color: var(--card-bg);
     transition: border-color var(--transition-speed);
+    -webkit-user-select: auto;
+    user-select: auto;
 }
 
 input:focus,
@@ -572,4 +581,84 @@ button i {
     .tab-content {
         display: block;
     }
+}
+
+/* Remove tap highlight on iOS */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Add native-like iOS button styles */
+.ios-button {
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: background-color 0.3s, transform 0.1s;
+}
+
+.ios-button:active {
+    transform: scale(0.98);
+}
+
+/* iOS-style switches */
+.ios-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 30px;
+}
+
+.ios-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.ios-switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.ios-switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 26px;
+    width: 26px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .ios-switch-slider {
+    background-color: #4a6da7;
+}
+
+input:checked + .ios-switch-slider:before {
+    transform: translateX(20px);
+}
+
+/* Safari-specific date picker styling */
+input[type="date"],
+input[type="datetime-local"] {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+/* Hide scrollbars on iOS but allow scrolling */
+.hide-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome, Safari and Opera */
 }
