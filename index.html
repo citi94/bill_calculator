@@ -233,7 +233,7 @@
         </main>
         
         <footer>
-            <p>&copy; 2025 Electricity Bill Calculator | <a href="#" id="privacyLink">Privacy</a></p>
+            <p>&copy; 2025 Peter Harding | <a href="#" id="privacyLink">Privacy</a></p>
         </footer>
         
         <!-- Modal for confirmations and dialogs -->
@@ -464,6 +464,39 @@
                 }
             },
             
+            // Save a single setting
+            saveSetting: async function(settingName, value) {
+                try {
+                    console.log(`Saving setting ${settingName}:`, value);
+                    // Get current settings
+                    const settings = this.getSettings();
+                    // Update the specific setting
+                    settings[settingName] = value;
+                    // Save back to localStorage
+                    const result = this.saveSettings(settings);
+                    return { success: result };
+                } catch (error) {
+                    console.error(`Error saving setting ${settingName}:`, error);
+                    return { success: false, error: error.message };
+                }
+            },
+            
+            // Get a single setting
+            getSetting: async function(settingName, defaultValue) {
+                try {
+                    const settings = this.getSettings();
+                    return settingName in settings ? settings[settingName] : defaultValue;
+                } catch (error) {
+                    console.error(`Error getting setting ${settingName}:`, error);
+                    return defaultValue;
+                }
+            },
+            
+            // Detect system dark mode preference
+            detectSystemDarkMode: function() {
+                return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            },
+            
             // Create a backup of all data
             createBackup: function() {
                 try {
@@ -651,6 +684,61 @@
             console.log('DOM loaded, initializing BillStorageManager');
             if (window.BillStorageManager && window.BillStorageManager.init) {
                 window.BillStorageManager.init();
+            }
+            
+            // Check for system dark mode preference
+            applySystemThemePreference();
+            
+            // Listen for changes to system dark mode preference
+            if (window.matchMedia) {
+                const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                
+                // Define handler
+                const handleSystemDarkModeChange = (e) => {
+                    console.log('System dark mode preference changed:', e.matches);
+                    applySystemThemePreference();
+                };
+                
+                // Add listener using appropriate method
+                if (darkModeMediaQuery.addEventListener) {
+                    darkModeMediaQuery.addEventListener('change', handleSystemDarkModeChange);
+                } else if (darkModeMediaQuery.addListener) {
+                    // Fallback for older browsers
+                    darkModeMediaQuery.addListener(handleSystemDarkModeChange);
+                }
+            }
+            
+            // Function to apply system theme preference if no user preference is set
+            function applySystemThemePreference() {
+                try {
+                    const settings = BillStorageManager.getSettings();
+                    
+                    // Only apply system preference if no explicit user preference exists
+                    if (settings.darkMode === undefined) {
+                        const systemPrefersDark = BillStorageManager.detectSystemDarkMode();
+                        console.log('System prefers dark mode:', systemPrefersDark);
+                        
+                        // Apply theme
+                        if (systemPrefersDark) {
+                            document.body.classList.add('dark-theme');
+                        } else {
+                            document.body.classList.remove('dark-theme');
+                        }
+                        
+                        // Update checkbox if it exists
+                        const darkModeToggle = document.getElementById('darkModeToggle');
+                        if (darkModeToggle) {
+                            darkModeToggle.checked = systemPrefersDark;
+                        }
+                        
+                        // Save this preference
+                        BillStorageManager.saveSetting('darkMode', systemPrefersDark)
+                            .then(result => console.log('Saved system dark mode preference:', result))
+                            .catch(err => console.error('Error saving dark mode preference:', err));
+                    }
+                } catch (error) {
+                    console.error('Error applying system theme preference:', error);
+                }
             }
         });
     </script>

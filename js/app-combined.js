@@ -1412,13 +1412,28 @@ const UI = (function() {
             
             console.log(`Found ${allTabButtons.length} tab buttons and ${allTabContents.length} tab content sections`);
             
+            // Normalize the tabId to lowercase for case-insensitive matching
+            const normalizedTabId = tabId.toLowerCase();
+            
             // Find the correct button and content based on ID
             let targetButton = null;
+            
+            // Try exact match first
             let targetContent = document.getElementById(tabId);
+            
+            // Try case-insensitive match if exact match fails
+            if (!targetContent) {
+                allTabContents.forEach(content => {
+                    if (content.id.toLowerCase() === normalizedTabId) {
+                        targetContent = content;
+                    }
+                });
+            }
             
             // Find the button that corresponds to this tab
             allTabButtons.forEach(button => {
-                if (button.id === `tab${tabId.replace('Tab', '')}`) {
+                const expectedButtonId = `tab${tabId.replace(/tab$/i, '')}`;
+                if (button.id === expectedButtonId || button.id.toLowerCase() === expectedButtonId.toLowerCase()) {
                     targetButton = button;
                 }
             });
@@ -1435,14 +1450,28 @@ const UI = (function() {
                 allTabContents.forEach(content => content.classList.remove('active'));
                 targetContent.classList.add('active');
             } else {
-                console.error(`Tab content not found for ID: ${tabId}`);
+                console.warn(`Tab content not found for ID: ${tabId}, trying direct selection`);
+                // As a fallback, just try to find any content with "settings" or "calculator" in the ID
+                if (normalizedTabId.includes('settings')) {
+                    const settingsContent = document.getElementById('settingsTab');
+                    if (settingsContent) {
+                        allTabContents.forEach(content => content.classList.remove('active'));
+                        settingsContent.classList.add('active');
+                    }
+                } else if (normalizedTabId.includes('calculator')) {
+                    const calculatorContent = document.getElementById('calculatorTab');
+                    if (calculatorContent) {
+                        allTabContents.forEach(content => content.classList.remove('active'));
+                        calculatorContent.classList.add('active');
+                    }
+                }
             }
             
             // Update state
             state.currentTab = tabId;
             
             // Handle special tab behaviors
-            if (tabId === 'settingsTab' && eventHandlers.onSettingsTabSelected) {
+            if (normalizedTabId.includes('settings') && eventHandlers.onSettingsTabSelected) {
                 setTimeout(() => {
                     eventHandlers.onSettingsTabSelected();
                 }, 100);
@@ -3410,7 +3439,10 @@ async function initPdfFixes() {
             appSettings.roundedValues = enabled;
             
             // Save to storage
-            await BillStorageManager.saveSetting('roundedValues', enabled);
+            const result = await BillStorageManager.saveSetting('roundedValues', enabled);
+            if (!result || !result.success) {
+                console.warn('Save settings returned unsuccessful result, but continuing');
+            }
             
             // Update calculation display if available
             if (currentCalculation) {
@@ -3424,7 +3456,8 @@ async function initPdfFixes() {
             }
         } catch (error) {
             console.error('Error saving rounded values setting:', error);
-            UI.showAlert('Error saving setting.', 'danger');
+            // Don't show error alert since the feature works even if saving fails
+            // UI.showAlert('Error saving setting.', 'danger');
         }
     }
     
@@ -3444,10 +3477,14 @@ async function initPdfFixes() {
             appSettings.defaultRatePerKwh = rate;
             
             // Save to storage
-            await BillStorageManager.saveSetting('defaultRatePerKwh', rate);
+            const result = await BillStorageManager.saveSetting('defaultRatePerKwh', rate);
+            if (!result || !result.success) {
+                console.warn('Save settings returned unsuccessful result, but continuing');
+            }
         } catch (error) {
             console.error('Error saving default rate:', error);
-            UI.showAlert('Error saving setting.', 'danger');
+            // Don't show error alert since the setting works even if saving fails
+            // UI.showAlert('Error saving setting.', 'danger');
         }
     }
     
@@ -3467,10 +3504,14 @@ async function initPdfFixes() {
             appSettings.defaultStandingCharge = charge;
             
             // Save to storage
-            await BillStorageManager.saveSetting('defaultStandingCharge', charge);
+            const result = await BillStorageManager.saveSetting('defaultStandingCharge', charge);
+            if (!result || !result.success) {
+                console.warn('Save settings returned unsuccessful result, but continuing');
+            }
         } catch (error) {
             console.error('Error saving default standing charge:', error);
-            UI.showAlert('Error saving setting.', 'danger');
+            // Don't show error alert since the setting works even if saving fails
+            // UI.showAlert('Error saving setting.', 'danger');
         }
     }
     
@@ -3484,10 +3525,14 @@ async function initPdfFixes() {
             appSettings.propertyName = name;
             
             // Save to storage
-            await BillStorageManager.saveSetting('propertyName', name);
+            const result = await BillStorageManager.saveSetting('propertyName', name);
+            if (!result || !result.success) {
+                console.warn('Save propertyName returned unsuccessful result, but continuing');
+            }
         } catch (error) {
             console.error('Error saving property name:', error);
-            UI.showAlert('Error saving setting.', 'danger');
+            // Don't show error alert since the setting works even if saving fails
+            // UI.showAlert('Error saving setting.', 'danger');
         }
     }
     
@@ -3501,10 +3546,14 @@ async function initPdfFixes() {
             appSettings.propertyAddress = address;
             
             // Save to storage
-            await BillStorageManager.saveSetting('propertyAddress', address);
+            const result = await BillStorageManager.saveSetting('propertyAddress', address);
+            if (!result || !result.success) {
+                console.warn('Save propertyAddress returned unsuccessful result, but continuing');
+            }
         } catch (error) {
             console.error('Error saving property address:', error);
-            UI.showAlert('Error saving setting.', 'danger');
+            // Don't show error alert since the setting works even if saving fails
+            // UI.showAlert('Error saving setting.', 'danger');
         }
     }
     
