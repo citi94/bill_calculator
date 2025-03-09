@@ -57,12 +57,12 @@
                     </div>
                     <div class="form-group">
                         <label for="prevMainMeter">Main Meter (kWh):</label>
-                        <input type="number" id="prevMainMeter" step="0.01" min="0">
+                        <input type="number" id="prevMainMeter" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
                     </div>
                     <div id="prevSubMetersContainer">
                         <div class="form-group">
                             <label for="prevSubMeter_0">Sub Meter (kWh):</label>
-                            <input type="number" id="prevSubMeter_0" step="0.01" min="0">
+                            <input type="number" id="prevSubMeter_0" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
                         </div>
                     </div>
                     <div class="form-group">
@@ -85,12 +85,12 @@
                     </div>
                     <div class="form-group">
                         <label for="currMainMeter">Main Meter (kWh):</label>
-                        <input type="number" id="currMainMeter" step="0.01" min="0">
+                        <input type="number" id="currMainMeter" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
                     </div>
                     <div id="currSubMetersContainer">
                         <div class="form-group sub-meter-group">
                             <label for="currSubMeter_0">Sub Meter (kWh):</label>
-                            <input type="number" id="currSubMeter_0" step="0.01" min="0">
+                            <input type="number" id="currSubMeter_0" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
                             <input type="text" id="subMeterLabel_0" placeholder="Label (e.g., Coffee Shop)" value="Coffee Shop">
                         </div>
                     </div>
@@ -103,11 +103,11 @@
                     <h2 class="card-title">Rates</h2>
                     <div class="form-group">
                         <label for="ratePerKwh">Rate per kWh (pence):</label>
-                        <input type="number" id="ratePerKwh" step="0.01" min="0">
+                        <input type="number" id="ratePerKwh" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
                     </div>
                     <div class="form-group">
                         <label for="standingCharge">Standing Charge (pence/day):</label>
-                        <input type="number" id="standingCharge" step="0.01" min="0">
+                        <input type="number" id="standingCharge" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
                     </div>
                     <div class="form-group">
                         <label for="standingChargeSplit">Standing Charge Split:</label>
@@ -119,7 +119,7 @@
                     </div>
                     <div id="customSplitContainer" class="form-group hidden">
                         <label for="customSplitPercentage">Main Property Share (%):</label>
-                        <input type="number" id="customSplitPercentage" min="0" max="100" value="50">
+                        <input type="number" id="customSplitPercentage" min="0" max="100" value="50" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
                     </div>
                 </div>
                 
@@ -186,11 +186,11 @@
                     <h2 class="card-title">Preferences</h2>
                     <div class="form-group">
                         <label for="defaultRatePerKwh">Default Rate per kWh (pence):</label>
-                        <input type="number" id="defaultRatePerKwh" step="0.01" min="0">
+                        <input type="number" id="defaultRatePerKwh" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
                     </div>
                     <div class="form-group">
                         <label for="defaultStandingCharge">Default Standing Charge (pence/day):</label>
-                        <input type="number" id="defaultStandingCharge" step="0.01" min="0">
+                        <input type="number" id="defaultStandingCharge" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
                     </div>
                     <div class="form-group checkbox-group">
                         <input type="checkbox" id="darkModeToggle">
@@ -1330,6 +1330,193 @@
                     tabSettings.addEventListener('click', () => directSwitchTab('settingsTab'));
                 }
             }, 1000);
+        });
+    </script>
+
+    <!-- Unsaved changes tracker and notification -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let hasUnsavedChanges = false;
+            let calculationComplete = false;
+            
+            // Add warning banner for unsaved changes
+            const warningBanner = document.createElement('div');
+            warningBanner.className = 'alert alert-warning save-reminder hidden';
+            warningBanner.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <strong>You have unsaved meter readings.</strong> Click "Save Reading" to store this data for future use.';
+            
+            // Insert after the results card
+            const resultsCard = document.getElementById('resultsCard');
+            if (resultsCard && resultsCard.parentNode) {
+                resultsCard.parentNode.insertBefore(warningBanner, resultsCard.nextSibling);
+            }
+            
+            // Track input changes
+            const allInputs = document.querySelectorAll('input[type="number"], input[type="text"], .date-input');
+            allInputs.forEach(input => {
+                input.addEventListener('change', function() {
+                    hasUnsavedChanges = true;
+                    
+                    // If a calculation has been completed, show the warning
+                    if (calculationComplete && !document.getElementById('resultsCard').classList.contains('hidden')) {
+                        warningBanner.classList.remove('hidden');
+                    }
+                });
+            });
+            
+            // When Calculate button is clicked
+            document.getElementById('calculateBtn')?.addEventListener('click', function() {
+                // Set flag when calculation is done
+                setTimeout(() => {
+                    calculationComplete = true;
+                    
+                    // Show warning if not saved yet
+                    if (hasUnsavedChanges && !document.getElementById('resultsCard').classList.contains('hidden')) {
+                        warningBanner.classList.remove('hidden');
+                    }
+                }, 500); // Small delay to ensure results are displayed
+            });
+            
+            // When Save Reading button is clicked
+            document.getElementById('saveReadingBtn')?.addEventListener('click', function() {
+                // Clear flags after saving
+                setTimeout(() => {
+                    hasUnsavedChanges = false;
+                    warningBanner.classList.add('hidden');
+                }, 500);
+            });
+
+            // Make Save button more prominent after calculation
+            const calculateBtn = document.getElementById('calculateBtn');
+            const saveReadingBtn = document.getElementById('saveReadingBtn');
+            
+            if (calculateBtn && saveReadingBtn) {
+                calculateBtn.addEventListener('click', function() {
+                    // Make the save button pulse to draw attention
+                    setTimeout(() => {
+                        saveReadingBtn.classList.add('pulse-button');
+                    }, 1000);
+                });
+                
+                saveReadingBtn.addEventListener('click', function() {
+                    // Remove pulse effect after saving
+                    this.classList.remove('pulse-button');
+                });
+            }
+            
+            // Add warning before leaving page with unsaved changes
+            window.addEventListener('beforeunload', function(e) {
+                if (hasUnsavedChanges && calculationComplete) {
+                    // Standard message (browsers may show their own message)
+                    const confirmationMessage = 'You have unsaved changes. Are you sure you want to leave?';
+                    e.returnValue = confirmationMessage;
+                    return confirmationMessage;
+                }
+            });
+        });
+    </script>
+
+    <!-- Add this CSS for the pulsing save button -->
+    <style>
+        .save-reminder {
+            margin-top: 15px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .save-reminder i {
+            margin-right: 8px;
+            font-size: 1.2em;
+        }
+        
+        .pulse-button {
+            animation: pulse 2s infinite;
+            box-shadow: 0 0 0 rgba(74, 109, 167, 0.4);
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(74, 109, 167, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(74, 109, 167, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(74, 109, 167, 0);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .save-reminder {
+                text-align: center;
+                padding: 12px;
+            }
+        }
+    </style>
+
+    <!-- Ensure all numeric inputs get proper iOS keyboard -->
+    <script>
+        // Ensure all numeric inputs get proper iOS keyboard
+        document.addEventListener('DOMContentLoaded', function() {
+            // Function to apply numeric input attributes
+            function ensureNumericInputs() {
+                const numericInputs = document.querySelectorAll('input[type="number"]');
+                numericInputs.forEach(input => {
+                    if (!input.hasAttribute('inputmode')) {
+                        input.setAttribute('inputmode', 'decimal');
+                        input.setAttribute('pattern', '[0-9]*[.,]?[0-9]*');
+                        console.log('Added iOS numeric keyboard support to:', input.id);
+                    }
+                });
+            }
+            
+            // Run on page load
+            ensureNumericInputs();
+            
+            // Also run when the DOM changes to catch dynamically added inputs
+            // Use a MutationObserver if available
+            if (window.MutationObserver) {
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                            // Check if any added nodes contain inputs
+                            mutation.addedNodes.forEach(node => {
+                                if (node.nodeType === 1) { // Element node
+                                    // If the node itself is an input
+                                    if (node.nodeName === 'INPUT' && node.type === 'number') {
+                                        if (!node.hasAttribute('inputmode')) {
+                                            node.setAttribute('inputmode', 'decimal');
+                                            node.setAttribute('pattern', '[0-9]*[.,]?[0-9]*');
+                                        }
+                                    }
+                                    
+                                    // Check for inputs within the added node
+                                    const childInputs = node.querySelectorAll('input[type="number"]');
+                                    if (childInputs.length > 0) {
+                                        childInputs.forEach(input => {
+                                            if (!input.hasAttribute('inputmode')) {
+                                                input.setAttribute('inputmode', 'decimal');
+                                                input.setAttribute('pattern', '[0-9]*[.,]?[0-9]*');
+                                            }
+                                        });
+                                    }
+                                }
+                            });
+                        }
+                    });
+                });
+                
+                // Observe the entire document
+                observer.observe(document.body, { 
+                    childList: true,
+                    subtree: true
+                });
+            }
+            
+            // Run periodically as a fallback
+            setInterval(ensureNumericInputs, 3000);
         });
     </script>
 </body>

@@ -3,23 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Electricity Bill Calculator - Currently Offline">
+    <meta name="theme-color" content="#4a6da7">
     <title>Offline - Electricity Bill Calculator</title>
-    <link rel="stylesheet" href="css/styles.css">
     <style>
+        :root {
+            --primary-color: #4a6da7;
+            --secondary-color: #68829e;
+            --background-color: #f5f5f5;
+            --card-color: #ffffff;
+            --text-color: #333333;
+            --border-color: #e0e0e0;
+            --success-color: #4caf50;
+            --warning-color: #ff9800;
+            --danger-color: #f44336;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
         .offline-container {
             text-align: center;
             padding: 2rem;
             max-width: 600px;
-            margin: 0 auto;
+            background-color: var(--card-color);
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin: 1rem;
         }
+        
         .offline-icon {
             font-size: 4rem;
             margin-bottom: 1rem;
-            color: #aaa;
+            color: var(--secondary-color);
+        }
+        
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+        
+        p {
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+        
+        .retry-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .retry-button:hover {
+            background-color: #3a5b8c;
+        }
+        
+        .connection-status {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background-color: #1c1c1e;
+                --card-color: #2c2c2e;
+                --text-color: #e0e0e0;
+                --border-color: #444444;
+            }
+            
+            .retry-button:hover {
+                background-color: #5a7ba8;
+            }
         }
     </style>
 </head>
-<body class="offline-page">
+<body>
     <div class="offline-container">
         <div class="offline-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -32,12 +107,52 @@
                 <line x1="12" y1="20" x2="12.01" y2="20"></line>
             </svg>
         </div>
-        <h1>You're offline</h1>
-        <p>The Electricity Bill Calculator requires an internet connection to load initially.</p>
-        <p>Please check your connection and try again.</p>
-        <button onclick="window.location.reload()" class="primary-button">
-            Try Again
-        </button>
+        <h1>You're Offline</h1>
+        <p>The Electricity Bill Calculator is currently offline. Your data is safely stored on your device, and you'll be able to access everything once you're back online.</p>
+        <p>If you've already used the app before, you should be able to continue using most features offline.</p>
+        <button onclick="checkConnection()" class="retry-button">Try Again</button>
+        <div class="connection-status" id="connectionStatus"></div>
     </div>
+    
+    <script>
+        // Check if we're truly offline
+        function checkConnection() {
+            const connectionStatus = document.getElementById('connectionStatus');
+            connectionStatus.textContent = "Checking connection...";
+            
+            // Try to fetch the main page
+            fetch('/index.html', { cache: 'no-store' })
+                .then(response => {
+                    if (response.ok) {
+                        connectionStatus.textContent = "You're back online! Redirecting...";
+                        setTimeout(() => {
+                            window.location.href = '/index.html';
+                        }, 1000);
+                    } else {
+                        connectionStatus.textContent = "Still offline. The server is unreachable.";
+                    }
+                })
+                .catch(error => {
+                    connectionStatus.textContent = "Still offline. Please check your internet connection.";
+                });
+        }
+        
+        // Listen for online event
+        window.addEventListener('online', function() {
+            const connectionStatus = document.getElementById('connectionStatus');
+            connectionStatus.textContent = "You're back online! Redirecting...";
+            setTimeout(() => {
+                window.location.href = '/index.html';
+            }, 1000);
+        });
+        
+        // Check connection status when page loads
+        window.addEventListener('load', function() {
+            if (navigator.onLine) {
+                // If we're online but seeing the offline page, redirect to main page
+                window.location.href = '/index.html';
+            }
+        });
+    </script>
 </body>
 </html>

@@ -1677,51 +1677,50 @@ const UI = (function() {
      * Add sub-meter fields to the form
      */
     function addSubMeterFields() {
-        if (!elements.currSubMetersContainer || !elements.prevSubMetersContainer) {
-            console.warn('Sub-meter containers not found');
-            return;
-        }
+        // Get container elements
+        const prevSubMetersContainer = document.getElementById('prevSubMetersContainer');
+        const currSubMetersContainer = document.getElementById('currSubMetersContainer');
         
-        // Increment sub-meter count
-        state.subMeterCount++;
+        // Exit if containers not found
+        if (!prevSubMetersContainer || !currSubMetersContainer) return;
         
-        // Create fields for current reading
-        const currSubMeterIndex = state.subMeterCount - 1;
-        const currSubMeterGroup = document.createElement('div');
-        currSubMeterGroup.className = 'form-group sub-meter-group';
-        currSubMeterGroup.innerHTML = `
-            <label for="currSubMeter_${currSubMeterIndex}">Sub Meter (kWh):</label>
-            <input type="number" id="currSubMeter_${currSubMeterIndex}" step="0.01" min="0">
-            <input type="text" id="subMeterLabel_${currSubMeterIndex}" placeholder="Label">
-            <button class="icon-button remove-submeter-btn" data-index="${currSubMeterIndex}" title="Remove">
-                <i class="fas fa-trash"></i>
-            </button>
-        `;
+        // Get current count of sub meters
+        const subMeterCount = currSubMetersContainer.querySelectorAll('.form-group').length;
+        const newIndex = subMeterCount;
         
-        // Add to container
-        elements.currSubMetersContainer.appendChild(currSubMeterGroup);
-        
-        // Create field for previous reading
+        // Create previous sub meter field
         const prevSubMeterField = document.createElement('div');
         prevSubMeterField.className = 'form-group';
         prevSubMeterField.innerHTML = `
-            <label for="prevSubMeter_${currSubMeterIndex}">Sub Meter (kWh):</label>
-            <input type="number" id="prevSubMeter_${currSubMeterIndex}" step="0.01" min="0">
+            <label for="prevSubMeter_${newIndex}">Sub Meter (kWh):</label>
+            <input type="number" id="prevSubMeter_${newIndex}" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
         `;
+        prevSubMetersContainer.appendChild(prevSubMeterField);
         
-        // Add to container
-        elements.prevSubMetersContainer.appendChild(prevSubMeterField);
+        // Create current sub meter field with label and delete button
+        const currSubMeterField = document.createElement('div');
+        currSubMeterField.className = 'form-group sub-meter-group';
+        currSubMeterField.setAttribute('data-index', newIndex);
+        currSubMeterField.innerHTML = `
+            <label for="currSubMeter_${newIndex}">Sub Meter (kWh):</label>
+            <input type="number" id="currSubMeter_${newIndex}" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*">
+            <input type="text" id="subMeterLabel_${newIndex}" placeholder="Label (e.g., Apartment ${newIndex + 1})">
+            <button type="button" class="icon-button remove-submeter" data-index="${newIndex}" title="Remove sub meter">
+                <i class="fas fa-trash-alt"></i>
+            </button>
+        `;
+        currSubMetersContainer.appendChild(currSubMeterField);
         
-        // Add event listener to remove button
-        const removeBtn = currSubMeterGroup.querySelector('.remove-submeter-btn');
-        if (removeBtn) {
-            removeBtn.addEventListener('click', function() {
-                removeSubMeterFields(parseInt(this.getAttribute('data-index')));
+        // Add event listener to delete button
+        const removeButton = currSubMeterField.querySelector('.remove-submeter');
+        if (removeButton) {
+            removeButton.addEventListener('click', function() {
+                const index = this.getAttribute('data-index');
+                if (index) {
+                    removeSubMeterFields(parseInt(index));
+                }
             });
         }
-        
-        // Log that a new sub-meter was added
-        console.log(`Added sub-meter field with index ${currSubMeterIndex}`);
     }
     
     /**
@@ -1729,27 +1728,76 @@ const UI = (function() {
      * @param {number} index The index of the sub-meter to remove
      */
     function removeSubMeterFields(index) {
-        // Only allow removal if there's more than one sub-meter
-        if (state.subMeterCount <= 1) {
+        // Get container elements
+        const prevSubMetersContainer = document.getElementById('prevSubMetersContainer');
+        const currSubMetersContainer = document.getElementById('currSubMetersContainer');
+        
+        // Exit if containers not found
+        if (!prevSubMetersContainer || !currSubMetersContainer) return;
+        
+        // Get all current sub meter groups
+        const currSubMeterGroups = currSubMetersContainer.querySelectorAll('.form-group');
+        const prevSubMeterGroups = prevSubMetersContainer.querySelectorAll('.form-group');
+        
+        // Ensure the index is valid
+        if (index < 0 || index >= currSubMeterGroups.length) {
+            console.warn(`Invalid sub meter index: ${index}`);
             return;
         }
         
-        // Remove the fields
-        const currSubMeter = document.getElementById(`currSubMeter_${index}`);
-        const prevSubMeter = document.getElementById(`prevSubMeter_${index}`);
-        
-        if (currSubMeter) {
-            const currGroup = currSubMeter.closest('.form-group');
-            if (currGroup) currGroup.remove();
+        // Remove the fields at the specified index
+        if (index < prevSubMeterGroups.length) {
+            prevSubMetersContainer.removeChild(prevSubMeterGroups[index]);
         }
         
-        if (prevSubMeter) {
-            const prevGroup = prevSubMeter.closest('.form-group');
-            if (prevGroup) prevGroup.remove();
+        if (index < currSubMeterGroups.length) {
+            currSubMetersContainer.removeChild(currSubMeterGroups[index]);
         }
         
-        // Decrement sub-meter count
-        state.subMeterCount--;
+        // Re-index remaining fields to ensure consecutive numbering
+        const remainingCurrFields = currSubMetersContainer.querySelectorAll('.form-group');
+        const remainingPrevFields = prevSubMetersContainer.querySelectorAll('.form-group');
+        
+        remainingCurrFields.forEach((field, newIndex) => {
+            // Update data-index attribute
+            field.setAttribute('data-index', newIndex);
+            
+            // Update input IDs and labels
+            const subMeterInput = field.querySelector('input[id^="currSubMeter_"]');
+            const labelInput = field.querySelector('input[id^="subMeterLabel_"]');
+            const removeButton = field.querySelector('.remove-submeter');
+            const label = field.querySelector('label');
+            
+            if (subMeterInput) {
+                subMeterInput.id = `currSubMeter_${newIndex}`;
+            }
+            
+            if (labelInput) {
+                labelInput.id = `subMeterLabel_${newIndex}`;
+            }
+            
+            if (removeButton) {
+                removeButton.setAttribute('data-index', newIndex);
+            }
+            
+            if (label) {
+                label.setAttribute('for', `currSubMeter_${newIndex}`);
+            }
+        });
+        
+        remainingPrevFields.forEach((field, newIndex) => {
+            // Update input IDs and labels
+            const subMeterInput = field.querySelector('input[id^="prevSubMeter_"]');
+            const label = field.querySelector('label');
+            
+            if (subMeterInput) {
+                subMeterInput.id = `prevSubMeter_${newIndex}`;
+            }
+            
+            if (label) {
+                label.setAttribute('for', `prevSubMeter_${newIndex}`);
+            }
+        });
     }
     
     /**
