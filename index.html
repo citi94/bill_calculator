@@ -1164,5 +1164,80 @@
             });
         });
     </script>
+    
+    <!-- Tab Fixing Script -->
+    <script>
+        // This script ensures tab navigation works properly
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Tab fix script loaded');
+            
+            // Direct event handlers for tab buttons
+            const tabCalculator = document.getElementById('tabCalculator');
+            const tabSettings = document.getElementById('tabSettings');
+            
+            // Contents
+            const calculatorTab = document.getElementById('calculatorTab');
+            const settingsTab = document.getElementById('settingsTab');
+            
+            function directSwitchTab(tabId) {
+                console.log('Direct tab switch to:', tabId);
+                
+                // Hide all tabs
+                if (calculatorTab) calculatorTab.classList.remove('active');
+                if (settingsTab) settingsTab.classList.remove('active');
+                
+                // Remove active class from all buttons
+                if (tabCalculator) tabCalculator.classList.remove('active');
+                if (tabSettings) tabSettings.classList.remove('active');
+                
+                // Show selected tab
+                if (tabId === 'calculatorTab') {
+                    if (calculatorTab) calculatorTab.classList.add('active');
+                    if (tabCalculator) tabCalculator.classList.add('active');
+                } else if (tabId === 'settingsTab') {
+                    if (settingsTab) settingsTab.classList.add('active');
+                    if (tabSettings) tabSettings.classList.add('active');
+                    
+                    // Update storage usage when switching to settings tab
+                    setTimeout(() => {
+                        const storageInfo = window.BillStorageManager?.getStorageUsage?.();
+                        if (storageInfo) {
+                            const storageUsageEl = document.getElementById('storageUsage');
+                            if (storageUsageEl) {
+                                storageUsageEl.textContent = `${storageInfo.totalSize} (${storageInfo.readingsCount} readings)`;
+                            }
+                        }
+                    }, 100);
+                }
+            }
+            
+            // Add direct event handlers
+            if (tabCalculator) {
+                tabCalculator.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    directSwitchTab('calculatorTab');
+                    return false;
+                });
+            }
+            
+            if (tabSettings) {
+                tabSettings.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    directSwitchTab('settingsTab');
+                    return false;
+                });
+            }
+            
+            // Fix tab buttons once more after a short delay
+            setTimeout(() => {
+                console.log('Delayed tab fix applied');
+                if (tabCalculator && tabSettings) {
+                    // Re-add event listeners
+                    tabCalculator.addEventListener('click', () => directSwitchTab('calculatorTab'));
+                    tabSettings.addEventListener('click', () => directSwitchTab('settingsTab'));
+                }
+            }, 1000);
+        });
+    </script>
 </body>
 </html>

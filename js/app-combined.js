@@ -478,6 +478,32 @@ window.BillValidator = BillValidator;
                     localStorage.setItem('electricity_backup', JSON.stringify(backup));
                     localStorage.setItem('electricity_readings', JSON.stringify([]));
                     return { success: true };
+                },
+                saveSetting: async function(settingName, value) {
+                    try {
+                        // Get current settings
+                        const settings = JSON.parse(localStorage.getItem('electricity_settings') || '{}');
+                        // Update the specific setting
+                        settings[settingName] = value;
+                        // Save back to localStorage
+                        localStorage.setItem('electricity_settings', JSON.stringify(settings));
+                        return { success: true };
+                    } catch (error) {
+                        console.error(`Error saving setting ${settingName}:`, error);
+                        return { success: false, error: error.message };
+                    }
+                },
+                detectSystemDarkMode: function() {
+                    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                },
+                getSetting: async function(settingName, defaultValue) {
+                    try {
+                        const settings = JSON.parse(localStorage.getItem('electricity_settings') || '{}');
+                        return settingName in settings ? settings[settingName] : defaultValue;
+                    } catch (error) {
+                        console.error(`Error getting setting ${settingName}:`, error);
+                        return defaultValue;
+                    }
                 }
             };
         }
@@ -749,7 +775,7 @@ window.BillCalculator = BillCalculator;
 // ====== PDF GENERATOR MODULE ======
 const PDFGenerator = (function() {
     /**
-     * Generate a detailed PDF report from a calculation result
+     * Generate a detailed bill PDF from a calculation result
      * @param {Object} calculation The calculation result
      * @param {Object} options Additional options for the PDF
      * @returns {jsPDF} The PDF document object
@@ -757,355 +783,251 @@ const PDFGenerator = (function() {
     function generateBillPDF(calculation, options = {}) {
         // Initialize jsPDF
         const { jsPDF } = window.jspdf;
-        // Create a new PDF in portrait mode
         const doc = new jsPDF();
         
         // PDF configuration
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
-        const margin = 20;
-        let yPos = 15;
+        const margin = 15;
+        const contentWidth = pageWidth - (margin * 2);
+        let yPos = margin;
         
-        // ======== UTILITY FUNCTIONS ========
+        // Simple formatting helpers
         const formatCurrency = (value) => `£${parseFloat(value).toFixed(2)}`;
         const formatNumber = (num, decimals = 1) => parseFloat(num).toFixed(decimals);
         
-        // Add new page and reset position
-        const addNewPage = () => {
-            doc.addPage();
-            yPos = 15;
-            // Add page header and footer
-            addPageHeader();
-            addPageFooter();
-        };
-        
-        // Check if we need to add a new page
+        // Check for page breaks
         const checkPageBreak = (neededSpace) => {
-            if (yPos + neededSpace > pageHeight - 40) {
-                addNewPage();
+            if (yPos + neededSpace > pageHeight - margin) {
+                doc.addPage();
+                yPos = margin;
                 return true;
             }
             return false;
         };
         
-        // ======== STYLE FUNCTIONS ========
-        // Function to add a page header to each page
-        const addPageHeader = () => {
-            // Add minimal header text
-            doc.setDrawColor(80, 80, 80);
-            doc.setLineWidth(0.5);
-            doc.line(margin, 12, pageWidth - margin, 12);
-            
-            doc.setFontSize(8);
-            doc.setTextColor(100, 100, 100);
-            doc.text("ELECTRICITY BILL", margin, 10);
-            
-            const dateText = new Date().toLocaleDateString('en-GB', {
-                day: 'numeric', month: 'long', year: 'numeric'
-            });
-            doc.text(dateText, pageWidth - margin, 10, { align: 'right' });
-        };
-        
-        // Function to add a page footer
-        const addPageFooter = () => {
-            doc.setDrawColor(80, 80, 80);
-            doc.setLineWidth(0.5);
-            doc.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
-            
-            doc.setFontSize(8);
-            doc.setTextColor(100, 100, 100);
-            doc.text("Generated with Electricity Bill Calculator", margin, pageHeight - 12);
-            doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin, pageHeight - 12, { align: 'right' });
-        };
-        
-        // Function to create a styled section title
-        const addSectionTitle = (title, withBackground = false) => {
-            if (withBackground) {
-                doc.setFillColor(230, 230, 230);
-                doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 12, 'F');
-            } else {
-                doc.setDrawColor(150, 150, 150);
-                doc.setLineWidth(0.1);
-                doc.line(margin, yPos + 7, pageWidth - margin, yPos + 7);
-            }
-            
-            doc.setFont(undefined, 'bold');
-            doc.setFontSize(11);
-            doc.setTextColor(50, 50, 50);
-            doc.text(title.toUpperCase(), margin, yPos + 3);
-            yPos += 14;
-        };
-        
-        // ======== BEGIN PDF GENERATION ========
-        // Add first page header and footer
-        addPageHeader();
-        addPageFooter();
-        
-        // ======== INVOICE HEADER ========
-        // Major title
-        doc.setFontSize(24);
-        doc.setTextColor(40, 40, 40);
-        doc.setFont(undefined, 'bold');
-        doc.text("ELECTRICITY INVOICE", pageWidth / 2, yPos + 10, { align: 'center' });
-        yPos += 25;
-        
-        // Add property information
-        doc.setFontSize(11);
+        // Title
+        doc.setFontSize(16);
         doc.setTextColor(0, 0, 0);
+        doc.setFont(undefined, 'bold');
+        doc.text("Electricity Bill Breakdown", margin, yPos);
+        yPos += 10;
+        
+        // Property and date info
+        doc.setFontSize(10);
         doc.setFont(undefined, 'normal');
         
-        // Invoice details box (right side)
-        const boxWidth = 80;
-        const boxHeight = 50;
-        const boxX = pageWidth - margin - boxWidth;
-        const boxY = yPos - 10;
-        
-        // Draw invoice details box
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.5);
-        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 2, 2);
-        
-        // Add invoice details text
-        doc.setFontSize(9);
-        doc.text("INVOICE DETAILS", boxX + 5, boxY + 8);
-        doc.setFontSize(8);
-        doc.text(`Invoice Date: ${new Date().toLocaleDateString('en-GB')}`, boxX + 5, boxY + 18);
-        doc.text(`Billing Period: ${calculation.readings.prev.date} to ${calculation.readings.curr.date}`, boxX + 5, boxY + 26);
-        doc.text(`Days: ${calculation.periodDays}`, boxX + 5, boxY + 34);
-        
-        // Property details (left side)
         if (options.propertyName) {
-            doc.setFontSize(12);
-            doc.setFont(undefined, 'bold');
             doc.text(options.propertyName, margin, yPos);
-            doc.setFont(undefined, 'normal');
-            yPos += 8;
-            
-            if (options.propertyAddress) {
-                doc.setFontSize(9);
-                const addressLines = options.propertyAddress.split('\n');
-                for (const line of addressLines) {
-                    doc.text(line, margin, yPos);
-                    yPos += 5;
-                }
-            }
+            yPos += 5;
         }
         
-        // Skip to after the box position
-        yPos = Math.max(yPos + 10, boxY + boxHeight + 15);
+        doc.text(`Period: ${calculation.readings.prev.date} to ${calculation.readings.curr.date} (${calculation.periodDays} days)`, margin, yPos);
+        yPos += 10;
         
-        // ======== INVOICE SUMMARY ========
-        // Add a highlighted summary box
-        const summaryBoxWidth = pageWidth - (margin * 2);
-        const summaryBoxHeight = 40;
-        const summaryBoxY = yPos;
-        
-        // Draw summary box with gradient-like effect
+        // Meter Readings Section
         doc.setFillColor(240, 240, 240);
-        doc.rect(margin, summaryBoxY, summaryBoxWidth, summaryBoxHeight, 'F');
-        doc.setFillColor(230, 230, 230);
-        doc.rect(margin, summaryBoxY + 20, summaryBoxWidth, summaryBoxHeight - 20, 'F');
-        
-        // Add summary text
+        doc.rect(margin, yPos, contentWidth, 7, 'F');
         doc.setFontSize(10);
-        doc.setTextColor(80, 80, 80);
-        doc.text("ELECTRICITY CONSUMPTION", margin + 10, summaryBoxY + 10);
-        
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`Total Usage: ${formatNumber(calculation.usages.total)} kWh`, margin + 10, summaryBoxY + 30);
-        
-        doc.setFontSize(14);
         doc.setFont(undefined, 'bold');
-        doc.text("TOTAL DUE:", pageWidth - margin - 90, summaryBoxY + 30);
-        doc.setFontSize(16);
-        doc.text(`${formatCurrency(calculation.costs.total)}`, pageWidth - margin - 10, summaryBoxY + 30, { align: 'right' });
-        doc.setFont(undefined, 'normal');
+        doc.text("Meter Readings", margin + 3, yPos + 5);
+        yPos += 10;
         
-        yPos = summaryBoxY + summaryBoxHeight + 20;
-        
-        // ======== METER READINGS ========
-        addSectionTitle("METER READINGS", true);
-        
-        // Table columns configuration
-        const colWidths = [50, 35, 35, 35];
+        // Calculate column widths carefully to avoid overflow
         const col1 = margin;
-        const col2 = col1 + colWidths[0] + 5;
-        const col3 = col2 + colWidths[1] + 5;
-        const col4 = col3 + colWidths[2] + 5;
+        const col2 = margin + 65;
+        const col3 = col2 + 30;
+        const col4 = col3 + 30;
+        const col5 = col4 + 30;
         
-        // Table header
-        doc.setFillColor(240, 240, 240);
-        doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 10, 'F');
-        
+        // Table headers for readings
         doc.setFontSize(8);
-        doc.setTextColor(80, 80, 80);
-        doc.setFont(undefined, 'bold');
-        doc.text("METER", col1, yPos);
-        doc.text("PREVIOUS", col2, yPos);
-        doc.text("CURRENT", col3, yPos);
-        doc.text("USAGE (kWh)", col4, yPos);
-        doc.setFont(undefined, 'normal');
-        yPos += 12;
+        doc.text("Meter", col1, yPos);
+        doc.text("Previous", col2, yPos);
+        doc.text("Current", col3, yPos);
+        doc.text("Usage", col4, yPos);
+        doc.text("kWh", col5, yPos);
+        yPos += 5;
         
-        // Main meter
+        // Draw a horizontal line under the headers
+        doc.setDrawColor(200, 200, 200);
+        doc.line(margin, yPos, margin + contentWidth, yPos);
+        yPos += 5;
+        
+        // Reset to normal font
+        doc.setFont(undefined, 'normal');
         doc.setFontSize(9);
-        doc.setTextColor(0, 0, 0);
+        
+        // Main meter reading
         doc.text("Main Meter", col1, yPos);
         doc.text(formatNumber(calculation.readings.prev.main), col2, yPos);
         doc.text(formatNumber(calculation.readings.curr.main), col3, yPos);
         doc.text(formatNumber(calculation.usages.main), col4, yPos);
-        yPos += 8;
+        yPos += 5;
         
-        // Sub meters
+        // Sub meter readings
         for (let i = 0; i < calculation.readings.prev.sub.length; i++) {
             const label = calculation.meterLabels.subMeters[i] || `Sub Meter ${i+1}`;
-            doc.text(label, col1, yPos);
+            // Ensure label doesn't overflow
+            const truncatedLabel = label.length > 12 ? label.substring(0, 11) + '…' : label;
+            
+            doc.text(truncatedLabel, col1, yPos);
             doc.text(formatNumber(calculation.readings.prev.sub[i]), col2, yPos);
             doc.text(formatNumber(calculation.readings.curr.sub[i]), col3, yPos);
             doc.text(formatNumber(calculation.usages.subMeters[i]), col4, yPos);
-            yPos += 8;
+            yPos += 5;
         }
         
         // Main property (derived)
         doc.setFont(undefined, 'bold');
-        doc.text("Main Property (derived)", col1, yPos);
+        doc.text("Main Property", col1, yPos);
         doc.text("-", col2, yPos);
         doc.text("-", col3, yPos);
         doc.text(formatNumber(calculation.usages.property), col4, yPos);
         doc.setFont(undefined, 'normal');
-        yPos += 15;
+        yPos += 8;
         
-        // ======== RATES SECTION ========
-        checkPageBreak(50);
-        addSectionTitle("RATE INFORMATION", true);
+        // Rates Section
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, yPos, contentWidth, 7, 'F');
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text("Rates", margin + 3, yPos + 5);
+        doc.setFont(undefined, 'normal');
+        yPos += 10;
         
-        const rateCol1 = margin + 5;
-        const rateCol2 = margin + 100;
-        
+        // Rate information
         doc.setFontSize(9);
-        doc.setTextColor(0, 0, 0);
+        doc.text(`Rate per kWh: ${calculation.rates.ratePerKwh}p (${formatCurrency(calculation.rates.ratePerKwh/100)}/kWh)`, margin, yPos);
+        yPos += 5;
         
-        // Rate per kWh
-        doc.text("Rate per kWh:", rateCol1, yPos);
-        doc.text(`${calculation.rates.ratePerKwh} pence (${formatCurrency(calculation.rates.ratePerKwh/100)} per kWh)`, rateCol2, yPos);
-        yPos += 8;
-        
-        // Standing charge
-        doc.text("Standing Charge:", rateCol1, yPos);
-        doc.text(`${calculation.rates.standingCharge} pence per day (${formatCurrency(calculation.rates.standingCharge/100)} per day)`, rateCol2, yPos);
-        yPos += 8;
-        
-        // Standing charge total
-        doc.text("Total Standing Charge:", rateCol1, yPos);
-        doc.text(`${formatCurrency(calculation.costs.totalStandingCharge)} for ${calculation.periodDays} days`, rateCol2, yPos);
-        yPos += 8;
+        doc.text(`Standing Charge: ${calculation.rates.standingCharge}p/day (${formatCurrency(calculation.rates.standingCharge/100)}/day)`, margin, yPos);
+        yPos += 5;
         
         // Standing charge split method
         let splitMethod = "";
         switch (calculation.rates.standingChargeSplit) {
-            case 'equal': splitMethod = "Equal split between all meters"; break;
-            case 'usage': splitMethod = "Split based on usage proportion"; break;
-            case 'custom': splitMethod = `Custom split (Main Property: ${calculation.rates.customSplitPercentage}%)`; break;
+            case 'equal': splitMethod = "Equal split between meters"; break;
+            case 'usage': splitMethod = "Split by usage proportion"; break;
+            case 'custom': splitMethod = `Custom (Main: ${calculation.rates.customSplitPercentage}%)`; break;
             default: splitMethod = "Equal split";
         }
         
-        doc.text("Standing Charge Split:", rateCol1, yPos);
-        doc.text(splitMethod, rateCol2, yPos);
-        yPos += 15;
+        doc.text(`Standing Charge Split: ${splitMethod}`, margin, yPos);
+        yPos += 10;
         
-        // ======== COST BREAKDOWN ========
-        checkPageBreak(60);
-        addSectionTitle("COST BREAKDOWN", true);
+        // Check if we need a page break before the cost breakdown
+        checkPageBreak(50);
         
-        // Cost table header
+        // Cost Breakdown Section
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, yPos, contentWidth, 7, 'F');
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text("Cost Breakdown", margin + 3, yPos + 5);
+        yPos += 10;
+        
+        // Define narrower column widths to ensure everything fits
         const costCol1 = margin;
         const costCol2 = margin + 65;
-        const costCol3 = margin + 100;
-        const costCol4 = margin + 140;
-        const costCol5 = pageWidth - margin - 10;
+        const costCol3 = costCol2 + 25;
+        const costCol4 = costCol3 + 25;
+        const costCol5 = costCol4 + 30;
         
-        doc.setFillColor(240, 240, 240);
-        doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 10, 'F');
-        
+        // Cost table headers
         doc.setFontSize(8);
-        doc.setTextColor(80, 80, 80);
-        doc.setFont(undefined, 'bold');
-        doc.text("METER", costCol1, yPos);
-        doc.text("USAGE (kWh)", costCol2, yPos);
-        doc.text("ENERGY (£)", costCol3, yPos);
-        doc.text("STANDING (£)", costCol4, yPos);
-        doc.text("TOTAL (£)", costCol5, yPos, { align: 'right' });
+        doc.text("Meter", costCol1, yPos);
+        doc.text("kWh", costCol2, yPos);
+        doc.text("Energy", costCol3, yPos);
+        doc.text("Standing", costCol4, yPos);
+        doc.text("Total", costCol5, yPos);
+        yPos += 5;
+        
+        // Draw a horizontal line under the headers
+        doc.setDrawColor(200, 200, 200);
+        doc.line(margin, yPos, margin + contentWidth, yPos);
+        yPos += 5;
+        
+        // Reset to normal font
         doc.setFont(undefined, 'normal');
-        yPos += 12;
-        
-        // Zebra striping function for rows
-        const addRowBackground = (index) => {
-            if (index % 2 === 1) {
-                doc.setFillColor(245, 245, 245);
-                doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 8, 'F');
-            }
-        };
-        
-        // Cost rows
         doc.setFontSize(9);
-        doc.setTextColor(0, 0, 0);
         
-        // Main property
-        addRowBackground(0);
+        // Main property cost
         doc.text(calculation.meterLabels.property, costCol1, yPos);
         doc.text(formatNumber(calculation.costs.property.usage), costCol2, yPos);
         doc.text(formatCurrency(calculation.costs.property.energyCost), costCol3, yPos);
         doc.text(formatCurrency(calculation.costs.property.standingCharge), costCol4, yPos);
-        doc.text(formatCurrency(calculation.costs.property.total), costCol5, yPos, { align: 'right' });
-        yPos += 8;
+        doc.text(formatCurrency(calculation.costs.property.total), costCol5, yPos);
+        yPos += 5;
         
-        // Sub meters
-        calculation.costs.subMeters.forEach((subMeter, index) => {
-            addRowBackground(index + 1);
-            doc.text(subMeter.label, costCol1, yPos);
+        // Sub meters costs
+        for (const subMeter of calculation.costs.subMeters) {
+            // Ensure label doesn't overflow
+            const truncatedLabel = subMeter.label.length > 12 ? subMeter.label.substring(0, 11) + '…' : subMeter.label;
+            
+            doc.text(truncatedLabel, costCol1, yPos);
             doc.text(formatNumber(subMeter.usage), costCol2, yPos);
             doc.text(formatCurrency(subMeter.energyCost), costCol3, yPos);
             doc.text(formatCurrency(subMeter.standingCharge), costCol4, yPos);
-            doc.text(formatCurrency(subMeter.total), costCol5, yPos, { align: 'right' });
-            yPos += 8;
-        });
+            doc.text(formatCurrency(subMeter.total), costCol5, yPos);
+            yPos += 5;
+        }
+        
+        // Draw line before total
+        yPos += 1;
+        doc.line(margin, yPos, margin + contentWidth, yPos);
+        yPos += 5;
+        
+        // Calculate the total energy cost
+        const totalEnergyCost = calculation.costs.property.energyCost + 
+            calculation.costs.subMeters.reduce((sum, meter) => sum + meter.energyCost, 0);
         
         // Total row
-        doc.setFillColor(220, 220, 220);
-        doc.rect(margin, yPos - 5, pageWidth - (margin * 2), 10, 'F');
-        
-        // Calculate total energy cost
-        const totalEnergyCost = calculation.costs.property.energyCost + 
-                               calculation.costs.subMeters.reduce((sum, meter) => sum + meter.energyCost, 0);
-        
         doc.setFont(undefined, 'bold');
-        doc.setFontSize(9);
         doc.text("TOTAL", costCol1, yPos);
         doc.text(formatNumber(calculation.usages.total), costCol2, yPos);
         doc.text(formatCurrency(totalEnergyCost), costCol3, yPos);
         doc.text(formatCurrency(calculation.costs.totalStandingCharge), costCol4, yPos);
-        doc.text(formatCurrency(calculation.costs.total), costCol5, yPos, { align: 'right' });
+        doc.text(formatCurrency(calculation.costs.total), costCol5, yPos);
         doc.setFont(undefined, 'normal');
-        yPos += 20;
+        yPos += 12;
         
-        // ======== PAYMENT INFORMATION ========
-        checkPageBreak(40);
-        addSectionTitle("PAYMENT INFORMATION");
+        // Summary Section - The most important information
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, yPos, contentWidth, 7, 'F');
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text("Bill Summary", margin + 3, yPos + 5);
+        yPos += 12;
         
-        doc.setFontSize(9);
-        doc.setTextColor(0, 0, 0);
-        doc.text("Please make payment within 14 days of receipt of this bill.", margin, yPos);
-        yPos += 8;
-        doc.text("For any queries regarding this bill, please contact the property manager.", margin, yPos);
-        yPos += 15;
+        // Amount due per meter
+        doc.setFontSize(10);
         
-        // Add a note about calculations
+        // Main property amount
+        doc.text(`${calculation.meterLabels.property}:`, margin, yPos);
+        doc.text(formatCurrency(calculation.costs.property.total), margin + 70, yPos);
+        yPos += 5;
+        
+        // Sub meter amounts
+        for (const subMeter of calculation.costs.subMeters) {
+            // Ensure label doesn't overflow
+            const truncatedLabel = subMeter.label.length > 13 ? subMeter.label.substring(0, 12) + '…' : subMeter.label;
+            
+            doc.text(`${truncatedLabel}:`, margin, yPos);
+            doc.text(formatCurrency(subMeter.total), margin + 70, yPos);
+            yPos += 5;
+        }
+        
+        // Total bill amount
+        yPos += 3;
+        doc.text("Total Bill:", margin, yPos);
+        doc.text(formatCurrency(calculation.costs.total), margin + 70, yPos);
+        
+        // Add date generated at bottom
         doc.setFontSize(8);
+        doc.setFont(undefined, 'normal');
         doc.setTextColor(100, 100, 100);
-        doc.text("Note: This bill was calculated based on the meter readings provided.", margin, yPos);
-        yPos += 6;
-        doc.text("All costs include VAT where applicable.", margin, yPos);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, pageHeight - margin);
         
         return doc;
     }
@@ -1117,138 +1039,125 @@ const PDFGenerator = (function() {
      * @returns {jsPDF} The PDF document object
      */
     function generateSummaryPDF(calculation, options = {}) {
-        // Initialize jsPDF in landscape for the summary
+        // Initialize jsPDF
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('landscape');
+        const doc = new jsPDF();
         
         // PDF configuration
         const pageWidth = doc.internal.pageSize.getWidth();
         const pageHeight = doc.internal.pageSize.getHeight();
-        const margin = 20;
-        let yPos = 20;
+        const margin = 15;
+        const contentWidth = pageWidth - (margin * 2);
+        let yPos = margin;
         
-        // Utility functions
+        // Simple formatting helpers
         const formatCurrency = (value) => `£${parseFloat(value).toFixed(2)}`;
         const formatNumber = (num, decimals = 1) => parseFloat(num).toFixed(decimals);
         
-        // Function to add section title
-        const addSectionTitle = (title) => {
-            doc.setDrawColor(200, 200, 200);
-            doc.setLineWidth(0.5);
-            doc.line(margin, yPos, pageWidth - margin, yPos);
-            
-            doc.setFont(undefined, 'bold');
-            doc.setFontSize(12);
-            doc.setTextColor(80, 80, 80);
-            doc.text(title.toUpperCase(), margin, yPos + 10);
-            yPos += 20;
-        };
-        
-        // Add document title
-        doc.setFontSize(24);
-        doc.setTextColor(40, 40, 40);
+        // Title
+        doc.setFontSize(16);
+        doc.setTextColor(0, 0, 0);
         doc.setFont(undefined, 'bold');
-        doc.text("ELECTRICITY BILL SUMMARY", pageWidth / 2, yPos, { align: 'center' });
-        yPos += 15;
+        doc.text("Electricity Bill - Summary", margin, yPos);
+        yPos += 10;
         
-        // Add property info and period
-        doc.setFontSize(12);
-        doc.setTextColor(80, 80, 80);
+        // Property and date info
+        doc.setFontSize(10);
         doc.setFont(undefined, 'normal');
         
         if (options.propertyName) {
-            doc.text(options.propertyName, pageWidth / 2, yPos, { align: 'center' });
-            yPos += 8;
+            doc.text(options.propertyName, margin, yPos);
+            yPos += 5;
         }
         
-        doc.text(`Period: ${calculation.readings.prev.date} to ${calculation.readings.curr.date} (${calculation.periodDays} days)`, 
-            pageWidth / 2, yPos, { align: 'center' });
-        yPos += 25;
-        
-        // Create a visual summary box
-        const boxWidth = 260;
-        const boxHeight = 100;
-        const boxX = (pageWidth - boxWidth) / 2;
-        const boxY = yPos;
-        
-        // Draw outer box
-        doc.setDrawColor(200, 200, 200);
-        doc.setFillColor(250, 250, 250);
-        doc.roundedRect(boxX, boxY, boxWidth, boxHeight, 5, 5, 'FD');
-        
-        // Draw inner sections
-        doc.setFillColor(240, 240, 240);
-        doc.rect(boxX, boxY + 30, boxWidth, 30, 'F');
-        
-        // Add content to box
-        doc.setFontSize(14);
-        doc.setTextColor(80, 80, 80);
-        doc.setFont(undefined, 'bold');
-        doc.text("ELECTRICITY BILL", boxX + (boxWidth / 2), boxY + 15, { align: 'center' });
-        
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'normal');
-        doc.text("Total Usage:", boxX + 20, boxY + 50);
-        doc.text(`${formatNumber(calculation.usages.total)} kWh`, boxX + boxWidth - 20, boxY + 50, { align: 'right' });
-        
-        doc.setFontSize(16);
-        doc.setTextColor(40, 40, 40);
-        doc.setFont(undefined, 'bold');
-        doc.text("TOTAL DUE:", boxX + 20, boxY + 85);
-        doc.setFontSize(20);
-        doc.text(formatCurrency(calculation.costs.total), boxX + boxWidth - 20, boxY + 85, { align: 'right' });
-        
-        yPos = boxY + boxHeight + 30;
-        
-        // Add usage breakdown
-        addSectionTitle("USAGE BREAKDOWN");
-        
-        const colWidth = (pageWidth - (margin * 2)) / 4;
-        const usageCol1 = margin + 10;
-        const usageCol2 = margin + colWidth;
-        const usageCol3 = margin + (colWidth * 2);
-        const usageCol4 = margin + (colWidth * 3);
-        
-        // Headers
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.setFont(undefined, 'bold');
-        doc.text("METER", usageCol1, yPos);
-        doc.text("USAGE (kWh)", usageCol2, yPos);
-        doc.text("COST (£)", usageCol3, yPos);
-        doc.text("% OF TOTAL", usageCol4, yPos);
+        doc.text(`Period: ${calculation.readings.prev.date} to ${calculation.readings.curr.date} (${calculation.periodDays} days)`, margin, yPos);
         yPos += 10;
         
-        // Main property
-        doc.setTextColor(40, 40, 40);
+        // Usage summary section
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, yPos, contentWidth, 7, 'F');
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text("Usage Summary", margin + 3, yPos + 5);
+        yPos += 12;
+        
+        // Create two simple columns
+        const col1 = margin;
+        const col2 = margin + 60;
+        
+        // Total usage
+        doc.setFontSize(9);
         doc.setFont(undefined, 'normal');
-        doc.text(calculation.meterLabels.property, usageCol1, yPos);
-        doc.text(formatNumber(calculation.usages.property), usageCol2, yPos);
-        doc.text(formatCurrency(calculation.costs.property.total), usageCol3, yPos);
-        const propertyPercent = (calculation.costs.property.total / calculation.costs.total * 100).toFixed(1);
-        doc.text(`${propertyPercent}%`, usageCol4, yPos);
+        doc.text("Total electricity used:", col1, yPos);
+        doc.text(`${formatNumber(calculation.usages.total)} kWh`, col2, yPos);
+        yPos += 7;
+        
+        // Individual usage
+        doc.text("Main Property:", col1, yPos);
+        doc.text(`${formatNumber(calculation.usages.property)} kWh`, col2, yPos);
+        yPos += 5;
+        
+        // Sub meter usages
+        for (let i = 0; i < calculation.usages.subMeters.length; i++) {
+            const label = calculation.meterLabels.subMeters[i] || `Sub Meter ${i+1}`;
+            // Ensure label doesn't overflow
+            const truncatedLabel = label.length > 10 ? label.substring(0, 9) + '…' : label;
+            
+            doc.text(`${truncatedLabel}:`, col1, yPos);
+            doc.text(`${formatNumber(calculation.usages.subMeters[i])} kWh`, col2, yPos);
+            yPos += 5;
+        }
+        
+        yPos += 5;
+        
+        // Cost summary section
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, yPos, contentWidth, 7, 'F');
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'bold');
+        doc.text("Bill Summary", margin + 3, yPos + 5);
+        yPos += 12;
+        
+        // Rates info
+        doc.setFontSize(9);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Rate: ${calculation.rates.ratePerKwh}p per kWh`, col1, yPos);
+        yPos += 5;
+        doc.text(`Standing Charge: ${calculation.rates.standingCharge}p per day`, col1, yPos);
         yPos += 8;
         
+        // Cost per meter
+        // Main property
+        doc.text(calculation.meterLabels.property + ":", col1, yPos);
+        doc.text(formatCurrency(calculation.costs.property.total), col2, yPos);
+        yPos += 5;
+        
         // Sub meters
-        calculation.costs.subMeters.forEach(subMeter => {
-            doc.text(subMeter.label, usageCol1, yPos);
-            doc.text(formatNumber(subMeter.usage), usageCol2, yPos);
-            doc.text(formatCurrency(subMeter.total), usageCol3, yPos);
-            const percent = (subMeter.total / calculation.costs.total * 100).toFixed(1);
-            doc.text(`${percent}%`, usageCol4, yPos);
-            yPos += 8;
-        });
+        for (const subMeter of calculation.costs.subMeters) {
+            // Ensure label doesn't overflow
+            const truncatedLabel = subMeter.label.length > 10 ? subMeter.label.substring(0, 9) + '…' : subMeter.label;
+            
+            doc.text(`${truncatedLabel}:`, col1, yPos);
+            doc.text(formatCurrency(subMeter.total), col2, yPos);
+            yPos += 5;
+        }
         
-        // Add a horizontal divider
+        // Draw line before total
+        yPos += 1;
         doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.5);
-        doc.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
+        doc.line(margin, yPos, margin + contentWidth, yPos);
+        yPos += 5;
         
-        // Add footer
+        // Total amount
+        doc.setFont(undefined, 'bold');
+        doc.text("Total Bill:", col1, yPos);
+        doc.text(formatCurrency(calculation.costs.total), col2, yPos);
+        
+        // Add date generated at bottom
         doc.setFontSize(8);
-        doc.setTextColor(120, 120, 120);
-        doc.text("Generated with Electricity Bill Calculator", margin, pageHeight - 10);
-        doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+        doc.setFont(undefined, 'normal');
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, pageHeight - margin);
         
         return doc;
     }
@@ -1439,57 +1348,82 @@ const UI = (function() {
     function initTabs() {
         console.log('Initializing tabs...');
         
-        if (!elements.tabButtons || elements.tabButtons.length === 0) {
-            console.warn('Tab buttons not found');
-            return;
-        }
-        
-        elements.tabButtons.forEach(button => {
-            if (button) {
-                button.addEventListener('click', () => {
-                    const tabId = button.id.replace('tab', '') + 'Tab';
-                    switchTab(tabId);
+        try {
+            // Get tab buttons directly
+            const tabButtons = document.querySelectorAll('.tab-button');
+            
+            if (tabButtons.length === 0) {
+                console.warn('Tab buttons not found, using fallback method');
+                // Try to find by ID directly
+                const calculatorTab = document.getElementById('tabCalculator');
+                const settingsTab = document.getElementById('tabSettings');
+                
+                if (calculatorTab) {
+                    calculatorTab.addEventListener('click', () => {
+                        console.log('Calculator tab clicked');
+                        switchTab('calculatorTab');
+                    });
+                }
+                
+                if (settingsTab) {
+                    settingsTab.addEventListener('click', () => {
+                        console.log('Settings tab clicked');
+                        switchTab('settingsTab');
+                    });
+                }
+            } else {
+                // Regular initialization
+                tabButtons.forEach(button => {
+                    button.addEventListener('click', () => {
+                        console.log(`Tab button ${button.id} clicked`);
+                        // Convert button ID (e.g., "tabCalculator") to tab ID (e.g., "calculatorTab")
+                        const tabId = button.id.replace('tab', '') + 'Tab';
+                        switchTab(tabId);
+                    });
                 });
             }
-        });
-        
-        console.log('Tabs initialized');
+            
+            // Make sure Calculator tab is active by default
+            const calculatorTabContent = document.getElementById('calculatorTab');
+            const calculatorTabButton = document.getElementById('tabCalculator');
+            
+            if (calculatorTabContent && calculatorTabButton) {
+                calculatorTabContent.classList.add('active');
+                calculatorTabButton.classList.add('active');
+            }
+            
+            console.log('Tabs initialized successfully');
+        } catch (error) {
+            console.error('Error initializing tabs:', error);
+        }
     }
     
     /**
-     * Switch active tab
+     * Switch to the specified tab
      * @param {string} tabId The ID of the tab to switch to
      */
     function switchTab(tabId) {
-        console.log(`Switching to tab: ${tabId}`);
+        console.log(`Switching to tab: ${tabId}`, new Date().toISOString());
         
-        // Fallback if elements are missing
-        if (!elements.tabButtons || !elements.tabContents) {
-            console.warn('Tab elements not available, trying direct DOM access');
+        try {
+            // Get all tab buttons and content sections directly
+            const allTabButtons = document.querySelectorAll('.tab-button');
+            const allTabContents = document.querySelectorAll('.tab-content');
             
-            // Direct DOM access as fallback
-            const allTabButtons = document.querySelectorAll('.tab-button, [role="tab"], button');
-            const allTabContents = document.querySelectorAll('.tab-content, [role="tabpanel"], section');
+            console.log(`Found ${allTabButtons.length} tab buttons and ${allTabContents.length} tab content sections`);
             
-            // Find button by content or ID
+            // Find the correct button and content based on ID
             let targetButton = null;
-            let targetContent = null;
+            let targetContent = document.getElementById(tabId);
             
-            switch(tabId) {
-                case 'calculatorTab':
-                    targetButton = Array.from(allTabButtons).find(btn => 
-                        btn.textContent.includes('Calculator') || btn.id.includes('Calculator'));
-                    targetContent = document.getElementById('calculatorTab') || 
-                        Array.from(allTabContents).find(content => content.id.includes('calculator'));
-                    break;
-                // History tab removed - case removed
-                case 'settingsTab':
-                    targetButton = Array.from(allTabButtons).find(btn => 
-                        btn.textContent.includes('Settings') || btn.id.includes('Settings'));
-                    targetContent = document.getElementById('settingsTab') || 
-                        Array.from(allTabContents).find(content => content.id.includes('settings'));
-                    break;
-            }
+            // Find the button that corresponds to this tab
+            allTabButtons.forEach(button => {
+                if (button.id === `tab${tabId.replace('Tab', '')}`) {
+                    targetButton = button;
+                }
+            });
+            
+            console.log(`Target button: ${targetButton ? targetButton.id : 'not found'}, Target content: ${targetContent ? targetContent.id : 'not found'}`);
             
             // Update active classes
             if (targetButton) {
@@ -1500,49 +1434,23 @@ const UI = (function() {
             if (targetContent) {
                 allTabContents.forEach(content => content.classList.remove('active'));
                 targetContent.classList.add('active');
+            } else {
+                console.error(`Tab content not found for ID: ${tabId}`);
             }
             
             // Update state
             state.currentTab = tabId;
             
-            // Handle special tab behaviors - history tab removed
+            // Handle special tab behaviors
             if (tabId === 'settingsTab' && eventHandlers.onSettingsTabSelected) {
-                eventHandlers.onSettingsTabSelected();
+                setTimeout(() => {
+                    eventHandlers.onSettingsTabSelected();
+                }, 100);
             }
             
-            return;
-        }
-        
-        // Regular tab switching with cached elements
-        elements.tabButtons.forEach(button => {
-            if (button) {
-                if (button.id === tabId.replace('Tab', '') || 
-                    button.textContent.trim().toLowerCase() === tabId.replace('Tab', '').toLowerCase()) {
-                    button.classList.add('active');
-                } else {
-                    button.classList.remove('active');
-                }
-            }
-        });
-        
-        elements.tabContents.forEach(content => {
-            if (content) {
-                if (content.id === tabId) {
-                    content.classList.add('active');
-                } else {
-                    content.classList.remove('active');
-                }
-            }
-        });
-        
-        // Update state
-        state.currentTab = tabId;
-        
-        // Special handling for tabs - history tab removed
-        if (tabId === 'settingsTab') {
-            if (eventHandlers.onSettingsTabSelected) {
-                eventHandlers.onSettingsTabSelected();
-            }
+            console.log(`Tab switch to ${tabId} completed`);
+        } catch (error) {
+            console.error(`Error switching tabs: ${error.message}`, error);
         }
     }
     
@@ -1737,7 +1645,7 @@ const UI = (function() {
     }
     
     /**
-     * Add fields for an additional sub-meter
+     * Add sub-meter fields to the form
      */
     function addSubMeterFields() {
         if (!elements.currSubMetersContainer || !elements.prevSubMetersContainer) {
@@ -1769,7 +1677,7 @@ const UI = (function() {
         prevSubMeterField.className = 'form-group';
         prevSubMeterField.innerHTML = `
             <label for="prevSubMeter_${currSubMeterIndex}">Sub Meter (kWh):</label>
-            <input type="text" id="prevSubMeter_${currSubMeterIndex}" readonly>
+            <input type="number" id="prevSubMeter_${currSubMeterIndex}" step="0.01" min="0">
         `;
         
         // Add to container
@@ -1782,6 +1690,9 @@ const UI = (function() {
                 removeSubMeterFields(parseInt(this.getAttribute('data-index')));
             });
         }
+        
+        // Log that a new sub-meter was added
+        console.log(`Added sub-meter field with index ${currSubMeterIndex}`);
     }
     
     /**
@@ -2708,7 +2619,35 @@ document.addEventListener('DOMContentLoaded', function() {
             await BillStorageManager.init();
             console.log('Storage initialized');
             
-            // Load settings from storage
+            // Add system dark mode change listener
+            if (window.matchMedia) {
+                const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                
+                // Define handler function
+                const handleSystemDarkModeChange = (e) => {
+                    // Only apply system preference if user hasn't explicitly set a preference
+                    BillStorageManager.getSetting('darkMode', null).then(userSetting => {
+                        if (userSetting === null) {
+                            toggleDarkMode(e.matches);
+                            // Update UI toggle
+                            const darkModeToggle = document.getElementById('darkModeToggle');
+                            if (darkModeToggle) {
+                                darkModeToggle.checked = e.matches;
+                            }
+                        }
+                    });
+                };
+                
+                // Add listener using the appropriate method
+                if (darkModeMediaQuery.addEventListener) {
+                    darkModeMediaQuery.addEventListener('change', handleSystemDarkModeChange);
+                } else if (darkModeMediaQuery.addListener) {
+                    // Fallback for older browsers
+                    darkModeMediaQuery.addListener(handleSystemDarkModeChange);
+                }
+            }
+            
+            // Load settings
             await loadSettings();
             console.log('Settings loaded');
             
@@ -2804,7 +2743,19 @@ document.addEventListener('DOMContentLoaded', function() {
      * Load application settings from storage
      */
     async function loadSettings() {
-        appSettings.darkMode = await BillStorageManager.getSetting('darkMode', false);
+        // Check if dark mode setting exists in storage
+        const darkModeSetting = await BillStorageManager.getSetting('darkMode', null);
+        
+        // If dark mode setting doesn't exist, use system preference
+        if (darkModeSetting === null) {
+            const systemPrefersDark = BillStorageManager.detectSystemDarkMode();
+            appSettings.darkMode = systemPrefersDark;
+            // Save this preference
+            await BillStorageManager.saveSetting('darkMode', systemPrefersDark);
+        } else {
+            appSettings.darkMode = darkModeSetting;
+        }
+        
         appSettings.roundedValues = await BillStorageManager.getSetting('roundedValues', true);
         appSettings.defaultRatePerKwh = await BillStorageManager.getSetting('defaultRatePerKwh', 28.0);
         appSettings.defaultStandingCharge = await BillStorageManager.getSetting('defaultStandingCharge', 140.0);
@@ -2947,140 +2898,38 @@ document.addEventListener('DOMContentLoaded', function() {
             
             console.log('Generating PDF from calculation:', currentCalculation);
             
-            // Generate detailed PDF
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+            // Get property details for the PDF
+            const pdfOptions = {
+                propertyName: appSettings.propertyName || '',
+                propertyAddress: appSettings.propertyAddress || ''
+            };
             
-            // PDF configuration
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const pageHeight = doc.internal.pageSize.getHeight();
-            const margin = 20;
-            let yPos = margin;
-            
-            // Add header
-            doc.setFontSize(22);
-            doc.setTextColor(74, 109, 167);
-            doc.text("Electricity Bill Calculation", pageWidth / 2, yPos, { align: "center" });
-            yPos += 10;
-            
-            // Add property details if provided
-            if (appSettings.propertyName) {
-                doc.setFontSize(12);
-                doc.setTextColor(100, 100, 100);
-                doc.text(appSettings.propertyName, pageWidth / 2, yPos, { align: "center" });
-                yPos += 10;
+            // Use the improved PDF generator
+            let pdf;
+            try {
+                pdf = PDFGenerator.generateBillPDF(currentCalculation, pdfOptions);
+                console.log('PDF generated successfully using PDFGenerator');
+            } catch (pdfError) {
+                console.error('Error using PDFGenerator:', pdfError);
+                UI.showAlert('Error generating PDF. Please try again.', 'danger');
+                return;
             }
             
-            // Add reading period
-            doc.setFontSize(14);
-            doc.setTextColor(0, 0, 0);
-            doc.text(`Reading Period: ${currentCalculation.readings.prev.date} to ${currentCalculation.readings.curr.date}`, margin, yPos);
-            yPos += 6;
-            doc.setFontSize(12);
-            doc.text(`${currentCalculation.periodDays} days`, margin, yPos);
-            yPos += 10;
-            
-            // Add meter readings
-            doc.setFontSize(16);
-            doc.setTextColor(74, 109, 167);
-            doc.text("Meter Readings", margin, yPos);
-            yPos += 10;
-            
-            // Table headers
-            doc.setFontSize(10);
-            doc.setTextColor(0, 0, 0);
-            doc.setFont(undefined, 'bold');
-            doc.text("Meter", margin + 5, yPos);
-            doc.text("Previous Reading", margin + 70, yPos);
-            doc.text("Current Reading", margin + 130, yPos);
-            doc.text("Usage (kWh)", pageWidth - margin - 30, yPos);
-            yPos += 8;
-            
-            // Reset font
-            doc.setFont(undefined, 'normal');
-            
-            // Main meter
-            doc.text("Main Meter", margin + 5, yPos);
-            doc.text(currentCalculation.readings.prev.main.toString(), margin + 70, yPos);
-            doc.text(currentCalculation.readings.curr.main.toString(), margin + 130, yPos);
-            doc.text(currentCalculation.usages.main.toFixed(1), pageWidth - margin - 30, yPos);
-            yPos += 6;
-            
-            // Sub meters
-            for (let i = 0; i < currentCalculation.readings.prev.sub.length; i++) {
-                const label = currentCalculation.meterLabels.subMeters[i] || `Sub Meter ${i+1}`;
-                doc.text(label, margin + 5, yPos);
-                doc.text(currentCalculation.readings.prev.sub[i].toString(), margin + 70, yPos);
-                doc.text(currentCalculation.readings.curr.sub[i].toString(), margin + 130, yPos);
-                doc.text(currentCalculation.usages.subMeters[i].toFixed(1), pageWidth - margin - 30, yPos);
-                yPos += 6;
+            // Save the PDF
+            try {
+                // Create filename with date
+                const date = new Date().toISOString().split('T')[0];
+                const fileName = `electricity_bill_${date}.pdf`;
+                pdf.save(fileName);
+                
+                UI.showAlert('PDF generated successfully.', 'success');
+            } catch (saveError) {
+                console.error('Error saving PDF:', saveError);
+                UI.showAlert('Error saving PDF. Please try again.', 'danger');
             }
-            
-            // Costs
-            yPos += 8;
-            doc.setFontSize(16);
-            doc.setTextColor(74, 109, 167);
-            doc.text("Costs", margin, yPos);
-            yPos += 10;
-            
-            doc.setFontSize(10);
-            doc.setTextColor(0, 0, 0);
-            doc.text(`Rate per kWh: ${currentCalculation.rates.ratePerKwh} pence`, margin + 5, yPos);
-            yPos += 6;
-            doc.text(`Standing Charge: ${currentCalculation.rates.standingCharge} pence per day`, margin + 5, yPos);
-            yPos += 10;
-            
-            // Table headers
-            doc.setFont(undefined, 'bold');
-            doc.text("Meter", margin + 5, yPos);
-            doc.text("Energy Cost (£)", margin + 80, yPos);
-            doc.text("Standing Charge (£)", margin + 140, yPos);
-            doc.text("Total (£)", pageWidth - margin - 30, yPos);
-            yPos += 8;
-            
-            // Reset font
-            doc.setFont(undefined, 'normal');
-            
-            // Property
-            doc.text("Main Property", margin + 5, yPos);
-            doc.text(currentCalculation.costs.property.energyCost.toFixed(2), margin + 80, yPos);
-            doc.text(currentCalculation.costs.property.standingCharge.toFixed(2), margin + 140, yPos);
-            doc.text(currentCalculation.costs.property.total.toFixed(2), pageWidth - margin - 30, yPos);
-            yPos += 6;
-            
-            // Sub meters
-            for (const subMeter of currentCalculation.costs.subMeters) {
-                doc.text(subMeter.label, margin + 5, yPos);
-                doc.text(subMeter.energyCost.toFixed(2), margin + 80, yPos);
-                doc.text(subMeter.standingCharge.toFixed(2), margin + 140, yPos);
-                doc.text(subMeter.total.toFixed(2), pageWidth - margin - 30, yPos);
-                yPos += 6;
-            }
-            
-            // Total
-            yPos += 4;
-            doc.setFont(undefined, 'bold');
-            doc.text("Total", margin + 5, yPos);
-            doc.text(currentCalculation.costs.total.toFixed(2), pageWidth - margin - 30, yPos);
-            
-            // Footer
-            yPos = pageHeight - margin;
-            doc.setFontSize(8);
-            doc.setTextColor(150, 150, 150);
-            doc.setFont(undefined, 'normal');
-            doc.text(`Generated on ${new Date().toLocaleDateString()}`, margin, yPos);
-            
-            // Generate filename based on date
-            const dateStr = currentCalculation.readings.curr.date.replace(/-/g, '');
-            const filename = `ElectricityBill_${dateStr}.pdf`;
-            
-            // Save PDF
-            doc.save(filename);
-            
-            UI.showAlert('PDF generated successfully.', 'success');
         } catch (error) {
-            console.error('PDF generation error:', error);
-            UI.showAlert('Error generating PDF: ' + error.message, 'danger');
+            console.error('Error generating PDF:', error);
+            UI.showAlert('Error generating PDF. Please try again.', 'danger');
         }
     }
 
@@ -3540,10 +3389,14 @@ async function initPdfFixes() {
             appSettings.darkMode = enabled;
             
             // Save to storage
-            await BillStorageManager.saveSetting('darkMode', enabled);
+            const result = await BillStorageManager.saveSetting('darkMode', enabled);
+            if (!result.success) {
+                throw new Error(result.error || 'Unknown error');
+            }
         } catch (error) {
             console.error('Error saving dark mode setting:', error);
-            UI.showAlert('Error saving setting.', 'danger');
+            // Don't show error if the mode was successfully applied - it's working even if save failed
+            // UI.showAlert('Error saving setting.', 'danger');
         }
     }
     
