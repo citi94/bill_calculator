@@ -522,3 +522,37 @@ button:disabled {
         grid-template-columns: 1fr;
     }
 }
+
+/* Add CSS for the previous reading options container */
+.previous-reading-options {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.previous-reading-options button {
+    flex: 1;
+    font-size: 0.9rem;
+}
+
+/* Small button for use in modals */
+.small-button {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.small-button:hover {
+    background-color: var(--primary-color-dark);
+}
+
+/* Modal table styling */
+.modal-table {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 15px;
+}

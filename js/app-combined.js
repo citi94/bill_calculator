@@ -1647,6 +1647,9 @@ const UI = (function() {
         elements.customSplitContainer = safeGetElement('customSplitContainer');
         elements.customSplitPercentage = safeGetElement('customSplitPercentage');
         elements.setTodayBtn = safeGetElement('setTodayBtn');
+        elements.setPrevDateBtn = safeGetElement('setPrevDateBtn');
+        elements.loadLastReadingBtn = safeGetElement('loadLastReadingBtn');
+        elements.loadFromHistoryBtn = safeGetElement('loadFromHistoryBtn');
         elements.addSubMeterBtn = safeGetElement('addSubMeterBtn');
         elements.calculateBtn = safeGetElement('calculateBtn');
         elements.generatePdfBtn = safeGetElement('generatePdfBtn');
@@ -1850,6 +1853,17 @@ const UI = (function() {
         
         // Calculator tab
         safeAddEventListener(elements.setTodayBtn, 'click', setTodayDate);
+        safeAddEventListener(elements.setPrevDateBtn, 'click', setPreviousDate);
+        safeAddEventListener(elements.loadLastReadingBtn, 'click', () => {
+            if (eventHandlers.onLoadLastReadingClicked) {
+                eventHandlers.onLoadLastReadingClicked();
+            }
+        });
+        safeAddEventListener(elements.loadFromHistoryBtn, 'click', () => {
+            if (eventHandlers.onLoadFromHistoryClicked) {
+                eventHandlers.onLoadFromHistoryClicked();
+            }
+        });
         safeAddEventListener(elements.addSubMeterBtn, 'click', addSubMeterFields);
         safeAddEventListener(elements.calculateBtn, 'click', () => {
             if (eventHandlers.onCalculateClicked) {
@@ -2811,23 +2825,25 @@ const UI = (function() {
     }
     
     // Return public methods
-return {
-    init,
-    on,
-    setFormData,
-    displayCalculationResult,
-    displayReadingHistory,
-    updateSettingsUI,
-    updateStorageUsage,
-    showAlert,
-    showConfirmationModal,
-    showReadingDetailsModal,
-    switchTab,
-    showFirstTimeSetup,
-    addInitialSubMeterField,
-    getInitialReadingsData,
-    addNewReadingCycleButton
-};
+    return {
+        init,
+        on,
+        setFormData,
+        displayCalculationResult,
+        displayReadingHistory,
+        updateSettingsUI,
+        updateStorageUsage,
+        showAlert,
+        showConfirmationModal,
+        showReadingDetailsModal,
+        switchTab,
+        showFirstTimeSetup,
+        addInitialSubMeterField,
+        getInitialReadingsData,
+        addNewReadingCycleButton,
+        updateSubMeterCount,
+        syncSubMeterFields
+    };
 })();
 
 // Make UI available globally
@@ -2966,6 +2982,8 @@ document.addEventListener('DOMContentLoaded', function() {
         UI.on('onCalculateClicked', handleCalculation);
         UI.on('onGeneratePdfClicked', generatePdf);
         UI.on('onSaveReadingClicked', saveReading);
+        UI.on('onLoadLastReadingClicked', loadLastReadingAsPrevious);
+        UI.on('onLoadFromHistoryClicked', showLoadFromHistoryModal);
         
         // History tab events
         UI.on('onHistoryTabSelected', loadReadingHistory);
@@ -3948,4 +3966,261 @@ function handleNewReadingCycle() {
         }
     );
 }
+
+    /**
+     * Sets the previous date field to today's date or displays a calendar
+     */
+    function setPreviousDate() {
+        const prevDateInput = elements.prevDate;
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, '0');
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const year = today.getFullYear();
+        prevDateInput.value = `${day}-${month}-${year}`;
+    }
+
+    /**
+     * Loads the most recent reading as the previous reading
+     */
+    async function loadLastReadingAsPrevious() {
+        try {
+            const mostRecentReading = await dataLayer.getMostRecentReading();
+            
+            if (mostRecentReading) {
+                // Set date to the current reading date from the most recent record
+                const date = new Date(mostRecentReading.currentDate);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                elements.prevDate.value = `${day}-${month}-${year}`;
+                
+                // Set main meter reading
+                elements.prevMainMeter.value = mostRecentReading.currentMainReading;
+                
+                // Clear existing sub meter fields
+                elements.prevSubMetersContainer.innerHTML = '';
+                
+                // Add sub meter fields with current values from the most recent reading
+                mostRecentReading.currentSubReadings.forEach((reading, index) => {
+                    const subMeterField = document.createElement('div');
+                    subMeterField.className = 'form-group';
+                    subMeterField.innerHTML = `
+                        <label for="prevSubMeter_${index}">Sub Meter (kWh):</label>
+                        <input type="number" id="prevSubMeter_${index}" step="0.01" min="0" value="${reading}">
+                    `;
+                    elements.prevSubMetersContainer.appendChild(subMeterField);
+                });
+                
+                showAlert('Last reading loaded as previous reading', 'success');
+                
+                // Update the subMeterCount to keep everything in sync
+                UI.updateSubMeterCount();
+            } else {
+                showAlert('No previous readings found', 'warning');
+            }
+        } catch (error) {
+            console.error('Error loading last reading:', error);
+            showAlert('Failed to load last reading', 'error');
+        }
+    }
+
+    /**
+     * Shows a modal with reading history to select as previous reading
+     */
+    async function showLoadFromHistoryModal() {
+        try {
+            const readings = await dataLayer.getAllReadings();
+            
+            if (!readings || readings.length === 0) {
+                showAlert('No reading history available', 'warning');
+                return;
+            }
+            
+            // Create a table of readings for the modal
+            let tableHTML = `
+                <h3>Select a Reading</h3>
+                <div class="table-container modal-table">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Main Meter</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            readings.forEach(reading => {
+                const date = new Date(reading.currentDate);
+                const formattedDate = date.toLocaleDateString();
+                
+                tableHTML += `
+                    <tr>
+                        <td>${formattedDate}</td>
+                        <td>${reading.currentMainReading} kWh</td>
+                        <td>
+                            <button class="small-button use-reading-btn" data-reading-id="${reading.id}">
+                                Use
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tableHTML += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            showCustomModal('Select Previous Reading', tableHTML, null, true);
+            
+            // Add event listeners to the "Use" buttons
+            document.querySelectorAll('.use-reading-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const readingId = this.getAttribute('data-reading-id');
+                    useHistoryReading(readingId);
+                    closeModal();
+                });
+            });
+            
+        } catch (error) {
+            console.error('Error showing history modal:', error);
+            showAlert('Failed to load reading history', 'error');
+        }
+    }
+
+    /**
+     * Uses a reading from history as the previous reading
+     * @param {string} readingId - The ID of the reading to use
+     */
+    async function useHistoryReading(readingId) {
+        try {
+            const readings = await dataLayer.getAllReadings();
+            const selectedReading = readings.find(reading => reading.id === readingId);
+            
+            if (selectedReading) {
+                // Set date
+                const date = new Date(selectedReading.currentDate);
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                elements.prevDate.value = `${day}-${month}-${year}`;
+                
+                // Set main meter reading
+                elements.prevMainMeter.value = selectedReading.currentMainReading;
+                
+                // Clear existing sub meter fields
+                elements.prevSubMetersContainer.innerHTML = '';
+                
+                // Add sub meter fields
+                selectedReading.currentSubReadings.forEach((reading, index) => {
+                    const subMeterField = document.createElement('div');
+                    subMeterField.className = 'form-group';
+                    subMeterField.innerHTML = `
+                        <label for="prevSubMeter_${index}">Sub Meter (kWh):</label>
+                        <input type="number" id="prevSubMeter_${index}" step="0.01" min="0" value="${reading}">
+                    `;
+                    elements.prevSubMetersContainer.appendChild(subMeterField);
+                });
+                
+                showAlert('Selected reading loaded as previous reading', 'success');
+                
+                // Update the subMeterCount to keep everything in sync
+                UI.updateSubMeterCount();
+            }
+        } catch (error) {
+            console.error('Error using history reading:', error);
+            showAlert('Failed to load selected reading', 'error');
+        }
+    }
+    
+    /**
+     * Shows a custom modal with specified content
+     */
+    function showCustomModal(title, bodyHTML, onConfirm, hideFooter = false) {
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+        const modalFooter = document.getElementById('modalFooter');
+        const modalOverlay = document.getElementById('modalOverlay');
+        
+        if (modalTitle) modalTitle.textContent = title;
+        if (modalBody) modalBody.innerHTML = bodyHTML;
+        
+        if (hideFooter && modalFooter) {
+            modalFooter.style.display = 'none';
+        } else if (modalFooter) {
+            modalFooter.style.display = 'flex';
+            
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+            if (confirmBtn && onConfirm) {
+                // Remove existing listeners by cloning
+                const newConfirmBtn = confirmBtn.cloneNode(true);
+                confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+                
+                // Add new listener
+                newConfirmBtn.addEventListener('click', () => {
+                    onConfirm();
+                    closeModal();
+                });
+            }
+        }
+        
+        if (modalOverlay) modalOverlay.classList.remove('hidden');
+    }
+
+    /**
+     * Attaches event listeners to DOM elements
+     * @returns {void}
+     */
+    function attachEventListeners() {
+        // ... [rest of the original code remains unchanged]
+    }
+
+    /**
+     * Updates the count of sub-meters based on visible fields
+     */
+    function updateSubMeterCount() {
+        // Count the current meter fields
+        const currSubMeters = document.querySelectorAll('input[id^="currSubMeter_"]');
+        
+        // Also check prev sub meters (they might have been added through loading)
+        const prevSubMeters = document.querySelectorAll('input[id^="prevSubMeter_"]');
+        
+        // Take the maximum of the two counts to ensure we have the accurate count
+        state.subMeterCount = Math.max(currSubMeters.length, prevSubMeters.length);
+        
+        // Ensure both sections have the same number of sub-meter fields
+        syncSubMeterFields();
+    }
+    
+    /**
+     * Ensures both previous and current sections have the same number of sub-meter fields
+     */
+    function syncSubMeterFields() {
+        const currSubMeters = document.querySelectorAll('input[id^="currSubMeter_"]');
+        const prevSubMeters = document.querySelectorAll('input[id^="prevSubMeter_"]');
+        
+        // If prev has more, add to current
+        if (prevSubMeters.length > currSubMeters.length) {
+            for (let i = currSubMeters.length; i < prevSubMeters.length; i++) {
+                addSubMeterFields();
+            }
+        }
+        
+        // If current has more, add to prev
+        if (currSubMeters.length > prevSubMeters.length) {
+            for (let i = prevSubMeters.length; i < currSubMeters.length; i++) {
+                // Add sub meter to prev section
+                const subMeterField = document.createElement('div');
+                subMeterField.className = 'form-group';
+                subMeterField.innerHTML = `
+                    <label for="prevSubMeter_${i}">Sub Meter (kWh):</label>
+                    <input type="number" id="prevSubMeter_${i}" step="0.01" min="0">
+                `;
+                elements.prevSubMetersContainer.appendChild(subMeterField);
+            }
+        }
+    }
 });
