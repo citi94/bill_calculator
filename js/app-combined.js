@@ -2921,36 +2921,85 @@ document.addEventListener('DOMContentLoaded', function() {
      * @param {Object} formData Form data from the UI
      */
     function handleCalculation(formData) {
-        // Validate form data
-        const validationResult = BillValidator.validateReadingSet(formData);
-        
-        if (!validationResult.isValid) {
-            // Show validation errors
-            UI.showAlert(`Please correct the following errors:\n${validationResult.errors.join('\n')}`, 'danger');
-            return;
-        }
-        
-        // Show warnings if any
-        if (validationResult.warnings.length > 0) {
-            console.warn('Validation warnings:', validationResult.warnings);
-            UI.showAlert(`Warning: ${validationResult.warnings.join(' ')}`, 'warning');
-        }
-        
         try {
-            // Perform calculation
-            currentCalculation = BillCalculator.calculateBill(formData);
+            // Validate data before calculation
+            const validationResult = BillCalculator.validateReadingSet(formData);
+            if (!validationResult.valid) {
+                // Show error in the dedicated error container
+                const errorContainer = document.getElementById('calculationErrorContainer');
+                const errorMessage = document.getElementById('calculationErrorMessage');
+                
+                if (errorContainer && errorMessage) {
+                    errorMessage.textContent = validationResult.message;
+                    errorContainer.classList.remove('hidden');
+                    
+                    // Scroll to the error container
+                    errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Hide after some time
+                    setTimeout(() => {
+                        errorContainer.classList.add('hidden');
+                    }, 8000);
+                } else {
+                    // Fallback to alert if container not found
+                    UI.showAlert(validationResult.message, 'danger');
+                }
+                
+                console.error('Validation failed:', validationResult.message);
+                return;
+            }
             
-            // Format calculation for display based on settings
+            // Hide error container if it was showing previously
+            const errorContainer = document.getElementById('calculationErrorContainer');
+            if (errorContainer) {
+                errorContainer.classList.add('hidden');
+            }
+            
+            // Calculate bill
+            const calculation = BillCalculator.calculateBill(formData);
+            
+            // Format calculation with rounded values if enabled
             const formattedCalculation = BillCalculator.formatCalculation(
-                currentCalculation, 
+                calculation, 
                 { roundedValues: appSettings.roundedValues }
             );
             
             // Display calculation results
             UI.displayCalculationResult(formattedCalculation);
+            
+            // Save calculation for PDF generation
+            currentCalculation = calculation;
+            
+            // Create a reading history entry based on the calculation
+            currentReadingData = BillCalculator.createReadingHistoryEntry(calculation);
+            
+            // Scroll to results
+            const resultsCard = document.getElementById('resultsCard');
+            if (resultsCard) {
+                resultsCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
         } catch (error) {
             console.error('Calculation error:', error);
-            UI.showAlert('Error performing calculation. Please check your inputs.', 'danger');
+            
+            // Show error in dedicated container
+            const errorContainer = document.getElementById('calculationErrorContainer');
+            const errorMessage = document.getElementById('calculationErrorMessage');
+            
+            if (errorContainer && errorMessage) {
+                errorMessage.textContent = `Calculation error: ${error.message || 'Unknown error'}`;
+                errorContainer.classList.remove('hidden');
+                
+                // Scroll to the error
+                errorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Hide after some time
+                setTimeout(() => {
+                    errorContainer.classList.add('hidden');
+                }, 8000);
+            } else {
+                // Fallback to alert
+                UI.showAlert(`Calculation error: ${error.message || 'Unknown error'}`, 'danger');
+            }
         }
     }
     
