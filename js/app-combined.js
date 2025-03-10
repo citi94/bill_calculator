@@ -4390,47 +4390,54 @@ document.addEventListener('DOMContentLoaded', updateOnlineStatus);
 
 // Add to your main JS
 function setupSwipeGestures() {
-  const content = document.querySelector('main');
-  let touchstartX = 0;
-  let touchendX = 0;
-  
-  // Only set up gestures if we're not on desktop
-  if (window.matchMedia('(max-width: 768px)').matches) {
-    content.addEventListener('touchstart', e => {
-      touchstartX = e.changedTouches[0].screenX;
-    });
+    // Disable swipe gestures between tabs as per user preference
+    // The user prefers tab buttons only for navigation
+    console.log('Swipe gestures disabled as per user preference');
     
-    content.addEventListener('touchend', e => {
-      touchendX = e.changedTouches[0].screenX;
-      handleSwipeGesture();
-    });
-  }
-  
-  function handleSwipeGesture() {
-    const threshold = 75; // Minimum swipe distance
+    // Original swipe functionality commented out:
+    /*
+    const content = document.querySelector('main');
+    let touchstartX = 0;
+    let touchendX = 0;
     
-    // If we have tabs for navigation
-    const tabButtons = document.querySelectorAll('.tab-button');
-    if (tabButtons.length > 1) {
-      if (touchendX < touchstartX - threshold) {
-        // Swipe left - go to next tab
-        const activeIdx = Array.from(tabButtons).findIndex(btn => btn.classList.contains('active'));
-        const nextIdx = (activeIdx + 1) % tabButtons.length;
-        if (nextIdx !== activeIdx) {
-          tabButtons[nextIdx].click();
-        }
-      }
-      
-      if (touchendX > touchstartX + threshold) {
-        // Swipe right - go to previous tab
-        const activeIdx = Array.from(tabButtons).findIndex(btn => btn.classList.contains('active'));
-        const prevIdx = (activeIdx - 1 + tabButtons.length) % tabButtons.length;
-        if (prevIdx !== activeIdx) {
-          tabButtons[prevIdx].click();
-        }
-      }
+    // Only set up gestures if we're not on desktop
+    if (window.matchMedia('(max-width: 768px)').matches) {
+        content.addEventListener('touchstart', e => {
+            touchstartX = e.changedTouches[0].screenX;
+        });
+        
+        content.addEventListener('touchend', e => {
+            touchendX = e.changedTouches[0].screenX;
+            handleSwipeGesture();
+        });
     }
-  }
+    
+    function handleSwipeGesture() {
+        const threshold = 75; // Minimum swipe distance
+        
+        // If we have tabs for navigation
+        const tabButtons = document.querySelectorAll('.tab-button');
+        if (tabButtons.length > 1) {
+            if (touchendX < touchstartX - threshold) {
+                // Swipe left - go to next tab
+                const activeIdx = Array.from(tabButtons).findIndex(btn => btn.classList.contains('active'));
+                const nextIdx = (activeIdx + 1) % tabButtons.length;
+                if (nextIdx !== activeIdx) {
+                    tabButtons[nextIdx].click();
+                }
+            }
+            
+            if (touchendX > touchstartX + threshold) {
+                // Swipe right - go to previous tab
+                const activeIdx = Array.from(tabButtons).findIndex(btn => btn.classList.contains('active'));
+                const prevIdx = (activeIdx - 1 + tabButtons.length) % tabButtons.length;
+                if (prevIdx !== activeIdx) {
+                    tabButtons[prevIdx].click();
+                }
+            }
+        }
+    }
+    */
 }
 
 // Set up gestures on page load

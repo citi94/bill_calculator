@@ -1196,9 +1196,13 @@
                     
                     // Load the most recent reading by default
                     if (readings.length > 0) {
-                        // Only auto-load if previous fields are empty
+                        // Always load the most recent reading automatically on startup
+                        // Check if either the date or the meter reading is missing
                         const prevMainMeter = document.getElementById('prevMainMeter');
-                        if (!prevMainMeter || !prevMainMeter.value) {
+                        const prevDateInput = document.getElementById('prevDate');
+                        
+                        // Only auto-load if either previous meter or date is empty
+                        if (!prevMainMeter || !prevMainMeter.value || !prevDateInput || !prevDateInput.value) {
                             console.log('Auto-loading most recent reading as previous reading');
                             loadPreviousReading(readings[0]);
                         }
@@ -1473,6 +1477,43 @@
             font-size: 1.3em;
         }
         
+        /* Fix date input appearance to match other inputs in dark mode */
+        .dark-theme .date-input {
+            background-color: #333 !important;  /* Match the dark input background */
+            color: #fff !important;             /* Light text for dark background */
+            border-color: #444 !important;      /* Subtle border */
+        }
+        
+        .dark-theme .flatpickr-input {
+            background-color: #333 !important;  /* Match other inputs */
+        }
+        
+        .dark-theme .flatpickr-calendar {
+            background-color: #2c2c2e !important; /* Darker background for the calendar */
+            box-shadow: 0 3px 13px rgba(0, 0, 0, 0.5) !important;
+        }
+        
+        .dark-theme .flatpickr-day {
+            color: #eee !important;             /* Light text for days */
+        }
+        
+        .dark-theme .flatpickr-day.selected {
+            background-color: #4a6da7 !important; /* Primary color for selected day */
+        }
+        
+        .dark-theme .flatpickr-months .flatpickr-month {
+            background-color: #2c2c2e !important; /* Match calendar background */
+            color: #fff !important;
+        }
+        
+        .dark-theme .flatpickr-current-month .flatpickr-monthDropdown-months {
+            background-color: #333 !important;
+        }
+        
+        .dark-theme .flatpickr-monthDropdown-month {
+            background-color: #333 !important;
+        }
+        
         .pulse-button {
             animation: pulse 2s infinite;
             box-shadow: 0 0 0 rgba(74, 109, 167, 0.4);
@@ -1683,6 +1724,94 @@
                 }, 300); // Short delay to ensure BillStorageManager is initialized
             });
         })();
+    </script>
+
+    <!-- Ensure previous reading data is fully loaded on startup -->
+    <script>
+        // Ensure previous reading data is fully loaded on startup
+        window.addEventListener('load', function() {
+            // Wait a bit longer to ensure storage is initialized and dropdown is populated
+            setTimeout(async function() {
+                console.log('Checking if previous reading fields need to be filled');
+                
+                // Get previous date and meter fields
+                const prevDateInput = document.getElementById('prevDate');
+                const prevMainMeter = document.getElementById('prevMainMeter');
+                
+                // If either field is empty, try to load the most recent reading
+                if ((!prevDateInput || !prevDateInput.value || 
+                     !prevMainMeter || !prevMainMeter.value) && 
+                    window.BillStorageManager && 
+                    window.BillStorageManager.getLastReading) {
+                    
+                    console.log('Auto-filling previous reading on page load');
+                    
+                    try {
+                        // Get the most recent reading
+                        const lastReading = await window.BillStorageManager.getLastReading();
+                        
+                        if (lastReading) {
+                            // Define formatDateDDMMYYYY if not available
+                            const formatDate = function(date) {
+                                const day = String(date.getDate()).padStart(2, '0');
+                                const month = String(date.getMonth() + 1).padStart(2, '0');
+                                const year = date.getFullYear();
+                                return `${day}-${month}-${year}`;
+                            };
+                            
+                            // Parse date
+                            const dateStr = lastReading.currentDate || lastReading.date;
+                            let date;
+                            
+                            if (typeof dateStr === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+                                // Handle DD-MM-YYYY format
+                                const [day, month, year] = dateStr.split('-').map(Number);
+                                date = new Date(year, month - 1, day); // Month is 0-indexed in JS
+                            } else {
+                                // Fallback to standard parsing
+                                date = new Date(dateStr);
+                            }
+                            
+                            // Set date
+                            if (prevDateInput && !prevDateInput.value) {
+                                if (prevDateInput._flatpickr) {
+                                    prevDateInput._flatpickr.setDate(date, true);
+                                } else {
+                                    prevDateInput.value = formatDate(date);
+                                }
+                            }
+                            
+                            // Set meter reading
+                            if (prevMainMeter && !prevMainMeter.value) {
+                                prevMainMeter.value = lastReading.currentMainReading || lastReading.mainMeter;
+                            }
+                            
+                            // Handle sub meters if needed
+                            const subReadings = lastReading.currentSubReadings || lastReading.subMeters;
+                            if (subReadings && subReadings.length > 0) {
+                                const prevSubMetersContainer = document.getElementById('prevSubMetersContainer');
+                                if (prevSubMetersContainer && prevSubMetersContainer.children.length === 0) {
+                                    prevSubMetersContainer.innerHTML = '';
+                                    subReadings.forEach((reading, index) => {
+                                        const subMeterField = document.createElement('div');
+                                        subMeterField.className = 'form-group';
+                                        subMeterField.innerHTML = `
+                                            <label for="prevSubMeter_${index}">Sub Meter (kWh):</label>
+                                            <input type="number" id="prevSubMeter_${index}" step="0.01" min="0" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" value="${reading}">
+                                        `;
+                                        prevSubMetersContainer.appendChild(subMeterField);
+                                    });
+                                }
+                            }
+                            
+                            console.log('Previous reading data filled successfully');
+                        }
+                    } catch (error) {
+                        console.error('Error auto-filling previous reading:', error);
+                    }
+                }
+            }, 1000); // Longer timeout to ensure everything is initialized
+        });
     </script>
 </body>
 </html>
