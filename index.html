@@ -1479,39 +1479,62 @@
         
         /* Fix date input appearance to match other inputs in dark mode */
         .dark-theme .date-input {
-            background-color: #333 !important;  /* Match the dark input background */
-            color: #fff !important;             /* Light text for dark background */
-            border-color: #444 !important;      /* Subtle border */
+            background-color: var(--card-bg) !important;  /* Match the dark input background */
+            color: var(--text-color) !important;          /* Match text color */
+            border-color: var(--border-color) !important; /* Match border color */
         }
         
         .dark-theme .flatpickr-input {
-            background-color: #333 !important;  /* Match other inputs */
+            background-color: var(--card-bg) !important;  /* Match other inputs */
         }
         
         .dark-theme .flatpickr-calendar {
-            background-color: #2c2c2e !important; /* Darker background for the calendar */
+            background-color: #2c2c2e !important;        /* Darker background for the calendar */
             box-shadow: 0 3px 13px rgba(0, 0, 0, 0.5) !important;
+            border: 1px solid var(--border-color) !important;
         }
         
         .dark-theme .flatpickr-day {
-            color: #eee !important;             /* Light text for days */
+            color: var(--text-color) !important;         /* Match text color */
+            background-color: var(--card-bg) !important; /* Match input background */
         }
         
         .dark-theme .flatpickr-day.selected {
-            background-color: #4a6da7 !important; /* Primary color for selected day */
+            background-color: var(--primary-color) !important; /* Primary color for selected day */
+            color: #fff !important;                           /* White text for selected day */
         }
         
         .dark-theme .flatpickr-months .flatpickr-month {
-            background-color: #2c2c2e !important; /* Match calendar background */
-            color: #fff !important;
+            background-color: var(--card-bg) !important;     /* Match calendar background */
+            color: var(--text-color) !important;             /* Match text color */
         }
         
         .dark-theme .flatpickr-current-month .flatpickr-monthDropdown-months {
-            background-color: #333 !important;
+            background-color: var(--card-bg) !important;     /* Match input background */
+            color: var(--text-color) !important;             /* Match text color */
         }
         
         .dark-theme .flatpickr-monthDropdown-month {
-            background-color: #333 !important;
+            background-color: var(--card-bg) !important;     /* Match input background */
+            color: var(--text-color) !important;             /* Match text color */
+        }
+        
+        .dark-theme .flatpickr-weekday {
+            color: var(--text-muted) !important;             /* Muted color for weekday headers */
+        }
+        
+        .dark-theme .flatpickr-current-month input.cur-year {
+            color: var(--text-color) !important;             /* Match text color */
+            background-color: var(--card-bg) !important;     /* Match input background */
+        }
+        
+        .dark-theme .flatpickr-time input {
+            color: var(--text-color) !important;             /* Match text color */
+            background-color: var(--card-bg) !important;     /* Match input background */
+        }
+        
+        .dark-theme .numInputWrapper:hover {
+            background-color: rgba(255, 255, 255, 0.05) !important; /* Subtle hover effect */
         }
         
         .pulse-button {
