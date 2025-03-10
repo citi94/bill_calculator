@@ -2923,14 +2923,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function handleCalculation(formData) {
         try {
             // Validate data before calculation
-            const validationResult = BillCalculator.validateReadingSet(formData);
-            if (!validationResult.valid) {
+            const validationResult = BillValidator.validateReadingSet(formData);
+            if (!validationResult.isValid) {
                 // Show error in the dedicated error container
                 const errorContainer = document.getElementById('calculationErrorContainer');
                 const errorMessage = document.getElementById('calculationErrorMessage');
                 
                 if (errorContainer && errorMessage) {
-                    errorMessage.textContent = validationResult.message;
+                    errorMessage.textContent = validationResult.errors.join('\n');
                     errorContainer.classList.remove('hidden');
                     
                     // Scroll to the error container
@@ -2942,11 +2942,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     }, 8000);
                 } else {
                     // Fallback to alert if container not found
-                    UI.showAlert(validationResult.message, 'danger');
+                    UI.showAlert(`Please correct the following errors:\n${validationResult.errors.join('\n')}`, 'danger');
                 }
                 
-                console.error('Validation failed:', validationResult.message);
+                console.error('Validation failed:', validationResult.errors);
                 return;
+            }
+            
+            // Show warnings if any
+            if (validationResult.warnings.length > 0) {
+                console.warn('Validation warnings:', validationResult.warnings);
+                UI.showAlert(`Warning: ${validationResult.warnings.join(' ')}`, 'warning');
             }
             
             // Hide error container if it was showing previously
